@@ -1,5 +1,3 @@
-#summary One-sentence summary of this page.
-
 = Introduction =
 
 This page defines the communication protocol between the judge client and the judge queue service.
