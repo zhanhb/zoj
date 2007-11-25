@@ -1,3 +1,4 @@
+#labels Phase-Design
 = Introduction =
 
 This page defines the communication protocol between the judge client and the judge queue service.
