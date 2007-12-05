@@ -1,0 +1,13 @@
+= Introduction =
+
+Table of different source file types accepted by ZOJ.
+
+= Details =
+
+|| *Source File Type* || *Suffix* || *Compiler* ||
+|| C++ || cc || g++ ||
+|| C++ || cpp || Visual C++ ||
+|| C || c || gcc ||
+|| Pascal || pas || Free Pascal ||
+|| Java || java || Sun JDK ||
+|| C# || cs || Visual C# ||
