@@ -4,10 +4,10 @@ Table of different source file types accepted by ZOJ.
 
 = Details =
 
-|| *Source File Type* || *Suffix* || *Compiler* ||
-|| C++ || cc || g++ ||
-|| C++ || cpp || Visual C++ ||
-|| C || c || gcc ||
-|| Pascal || pas || Free Pascal ||
-|| Java || java || Sun JDK ||
-|| C# || cs || Visual C# ||
+|| *Source File Type* || *Suffix* || *Compiler* || *code* ||
+|| C++ || cc || g++ || 1 ||
+|| C++ || cpp || Visual C++ || 2 ||
+|| C || c || gcc || 3 ||
+|| Pascal || pas || Free Pascal || 4 ||
+|| Java || java || Sun JDK || 5 ||
+|| C# || cs || Visual C# || 6 ||
