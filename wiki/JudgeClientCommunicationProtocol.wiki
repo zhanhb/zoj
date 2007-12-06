@@ -52,8 +52,8 @@ The service first sends a 4-byte unsigned integer indicating the size of the zip
 After the client receives the data file, it will reply with one of the following code:
 || *Code* || *Name* || *Description* ||
 || 100 || Ready || Everything is ok. The client is ready to judge the program. ||
-|| 109 || !InvalidDataSize || Data file size is not a positive integer. ||
-|| 110 || !InvalidData || Data file can not be decompressed or its content structure is invalid. ||
+|| 107 || !InvalidDataSize || Data file size is not a positive integer. ||
+|| 108 || !InvalidData || Data file can not be decompressed or its content structure is invalid. ||
 
 == 3. Judge ==
 After everything is ready, the client begins to judge the program. It will report the status to the service continuously. There are 2 types of messages:
