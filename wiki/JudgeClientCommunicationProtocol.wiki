@@ -34,13 +34,12 @@ After the client receives the judge request, it will reply with an unsigned inte
 || 100 || Ready || Everything is ok. The client is ready to judge the program. ||
 || 101 || !UnsupportedSourceFileType || The client does not know how to compile the source file. It can happen when the service sends out an invalid one or to a wrong client. ||
 || 102 || !NoSuchProblem || The problem or its specified version is not found by the client. Need data synchronization. ||
-|| 103 || !InvalidProblem || Problem id is not a positive integer. ||
-|| 104 || !InvalidTestcase || Testcase number is not a non-negative integer or no corresponding testcase found by the client. ||
-|| 105 || !InvalidTimeLimit || Time limit is not a positive integer or is too large. ||
-|| 106 || !InvalidMemoryLimit || Memory limit is not a positive integer or is too large. ||
-|| 107 || !InvalidOutputLimit || Output limit is not a positive integer or is too large. ||
-|| 108 || !InvalidDataSize || Source file size is not a positive integer or is too large. ||
-|| 109 || !InvalidData || Source file can not be decompressed or its size is too large. ||
+|| 103 || !InvalidTestcase || No corresponding testcase found by the client. ||
+|| 104 || !InvalidTimeLimit || Time limit is 0 or too large. ||
+|| 105 || !InvalidMemoryLimit || Memory limit is 0 or too large. ||
+|| 106 || !InvalidOutputLimit || Output limit is 0 or too large. ||
+|| 107 || !InvalidDataSize || Source file size is 0 or too large. ||
+|| 108 || !InvalidData || Source file can not be decompressed or its size is too large. ||
 || 14 || !InternalError || Something wrong in the client itself. Could be caused by system issues, for example, the disk is full. ||
 
 == 2. Data Synchronization ==
@@ -53,8 +52,8 @@ The service first sends a 4-byte unsigned integer indicating the size of the zip
 After the client receives the data file, it will reply with one of the following code:
 || *Code* || *Name* || *Description* ||
 || 100 || Ready || Everything is ok. The client is ready to judge the program. ||
-|| 117 || !InvalidDataSize || Data file size is not a positive integer. ||
-|| 118 || !InvalidData || Data file can not be decompressed or its content structure is invalid. ||
+|| 109 || !InvalidDataSize || Data file size is not a positive integer. ||
+|| 110 || !InvalidData || Data file can not be decompressed or its content structure is invalid. ||
 
 == 3. Judge ==
 After everything is ready, the client begins to judge the program. It will report the status to the service continuously. There are 2 types of messages:
