@@ -22,7 +22,9 @@ The service first sends out a header to the client. A header is always 9 bytes l
 || Version || 4 || An unsigned integer representing the current version of the problem. If this version is not found by the judge client, a synchronization is required. ||
 
 == 2. Source File ==
-If the client runs on the same machine with the queue service, then no source file is required. Otherwise, the service should send the source file to the client immediately after the header. The file should be compressed using Lempel-Ziv coding (LZ77) before transmission, that is, the gzip file format. The service first sends a 2-byte unsigned integer indicating the size of the compressed file in bytes, then its binary content. Neither the original nor the compressed source file size can be more than 65536(64K).
+The service should send the source file to the client immediately after the header. The file should be compressed using Lempel-Ziv coding (LZ77) before transmission, that is, the gzip file format. The service first sends a 2-byte unsigned integer indicating the size of the compressed file in bytes, then its content. Neither the original nor the compressed source file size can be more than 65536(64K).
+
+Especially, if the client runs on the same machine with the service, then the service should send the path of the source file instead of its content to the client. The service sends a 2-byte unsigned integer indicating the length of the path followed by the path itself.
 
 == 3. Client Response ==
 After the client receives the header and the source file(if required), it will reply with a one-byte code defined as follows:
