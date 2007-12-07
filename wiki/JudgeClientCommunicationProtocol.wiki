@@ -27,13 +27,13 @@ The service should send the source file to the client immediately after the head
 Especially, if the client runs on the same machine with the service, then the service should send the path of the source file instead of its content to the client. The service sends a 2-byte unsigned integer indicating the length of the path followed by the path itself.
 
 == 3. Client Response ==
-After the client receives the header and the source file(if required), it will reply with a one-byte code defined as follows:
+After the client receives the header and the source file(or its path), it will reply with a one-byte code defined as follows:
 || *Code* || *Name* || *Description* ||
 || 100 || Ready || Everything is ok. The client is ready to judge the program. ||
 || 101 || Unsupported Source File Type || The client does not know how to compile the source file. It can happen when the service sends out an invalid one or to a wrong client. ||
 || 102 || No Such Problem || The problem or its specified version is not found by the client. Need data synchronization. ||
-|| 103 || Invalid Data Size || Source file size is 0 or too large. ||
-|| 104 || Invalid Data || Source file can not be decompressed or its size is too large. ||
+|| 103 || Invalid Data Size || Source file size is 0 or the path length is greater than MAX_PATH. ||
+|| 104 || Invalid Data || Source file can not be decompressed, or the path does not refer to a valid file. ||
 || 14 || Internal Error || Something wrong in the client itself. Could be caused by system issues, for example, the disk is full. ||
 
 == 4. Data Synchronization ==
