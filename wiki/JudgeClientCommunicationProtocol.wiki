@@ -19,10 +19,10 @@ The service first sends out a header to the client. A header is always 9 bytes l
 || *Name* || *Size* || *Description* ||
 || Source File Type || 1 || The source file type code which is defined [SourceFileSuffixList here]. The client uses it to determine which compiler to use. ||
 || Problem Id || 4 || An unsigned integer which is the global unique id of the problem that the source file tries to solve. ||
-|| Version || 4 || An unsigned integer representing the current version of the problem. If this version is not found by the judge client, a synchronization is required. ||
+|| Version || 4 || An unsigned integer representing the current version of the problem. If this version is not found by the judge client, a synchronization is required. If this value is 0xffffffff, it means the test data will be provided by the service. ||
 
 == 2. Source File ==
-The service should send the source file to the client immediately after the header. The file should be compressed using Lempel-Ziv coding (LZ77) before transmission, that is, the gzip file format. The service first sends a 2-byte unsigned integer indicating the size of the compressed file in bytes, then its content. Neither the original nor the compressed source file size can be more than 65536(64K).
+The service should send the source file to the client immediately after the header. The service first sends a 2-byte unsigned integer indicating the size of the file in bytes, then its content. The source file size can be no more than 65536(64K).
 
 Especially, if the client runs on the same machine with the service, then the service should send the path of the source file instead of its content to the client. The service sends a 2-byte unsigned integer indicating the length of the path followed by the path itself.
 
@@ -37,7 +37,7 @@ After the client receives the header and the source file(or its path), it will r
 || 14 || Internal Error || Something wrong in the client itself. Could be caused by system issues, for example, the disk is full. ||
 
 == 4. Data Synchronization ==
-If the client replies with code 102(No Such Problem), the service should send the problem data to the client.
+If the client replies with code 102(No Such Problem), the service should send the problem data to the client. 
 
 The data should be a [http://en.wikipedia.org/wiki/PKZIP PKZIP] compatible zip file. Its content should have exactly the same structure as the directory for a specific version of a problem, which is defined [ProblemDirectoryStructure here]
 
@@ -49,6 +49,8 @@ After the client receives the data file, it will reply with one of the following
 || 103 || !InvalidDataSize || Data file size is not a positive integer. ||
 || 104 || !InvalidData || Data file can not be decompressed or its content structure is invalid. ||
 || 14 || Internal Error || Something wrong in the client itself. Could be caused by system issues, for example, the disk is full. ||
+
+If the version in the header is 0xffffffff, then the service should send the test data to the client. The service first sends a 4-byte unsigned integer indicating the size of the test data followed by its content. The reply of the client should be the same as those defined above.
 
 == 5. Judge ==
 After everything is ready, the service can ask the client to run testcases. It is a 9-byte long message defined as follows:
