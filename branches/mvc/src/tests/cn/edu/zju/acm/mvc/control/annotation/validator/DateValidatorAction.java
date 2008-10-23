@@ -3,10 +3,10 @@ package cn.edu.zju.acm.mvc.control.annotation.validator;
 
 import java.util.Date;
 
-import cn.edu.zju.acm.mvc.control.action.ActionBase;
+import cn.edu.zju.acm.mvc.control.TestActionBase;
 import cn.edu.zju.acm.mvc.control.annotation.validator.DateValidator;
 
-public class DateValidatorAction extends ActionBase {
+public class DateValidatorAction extends TestActionBase {
 
     Date dateProp;
 

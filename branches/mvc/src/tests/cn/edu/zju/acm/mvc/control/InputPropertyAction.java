@@ -1,10 +1,10 @@
- 
-package cn.edu.zju.acm.mvc.control.action;
+
+package cn.edu.zju.acm.mvc.control;
 
 import java.io.File;
 import java.util.Date;
 
-public class PropertyAction extends ActionBase {
+public class InputPropertyAction extends TestActionBase {
 
     private int intProp;
 

@@ -5,4 +5,5 @@ public enum ResultType {
     Redirect,
     Jsp,
     ZView,
+    Raw,
 }

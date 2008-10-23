@@ -6,16 +6,17 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
-public @interface Result {
+@Target(ElementType.METHOD)
+public @interface Cookie {
 
-    String name();
+    int maxAge() default -1;
 
-    String value();
-    
-    ResultType type();
-    
-    Header[] headers() default {};
+    String domain() default "";
+
+    String path() default "";
+
+    boolean secure() default false;
+
+    int version() default 0;
 }

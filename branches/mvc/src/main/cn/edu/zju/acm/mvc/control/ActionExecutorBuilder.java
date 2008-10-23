@@ -255,8 +255,8 @@ public class ActionExecutorBuilder {
     }
 
     private void buildExecution(MethodVisitor mv) {
-        List<Pair<String, String>> resultList = this.actionDescriptor.getResultList();
-        List<Pair<Class<? extends Throwable>, String>> exceptionList = this.actionDescriptor.getExceptionList();
+        List<Pair<String, String>> resultList = this.actionDescriptor.getResultMap();
+        List<Pair<Class<? extends Throwable>, String>> exceptionList = this.actionDescriptor.getExceptionMap();
 
         // var1 = null
         mv.visitInsn(Opcodes.ACONST_NULL);

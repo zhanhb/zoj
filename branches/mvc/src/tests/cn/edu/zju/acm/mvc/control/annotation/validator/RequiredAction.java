@@ -4,10 +4,10 @@ package cn.edu.zju.acm.mvc.control.annotation.validator;
 import java.io.File;
 import java.util.Date;
 
-import cn.edu.zju.acm.mvc.control.action.ActionBase;
+import cn.edu.zju.acm.mvc.control.TestActionBase;
 import cn.edu.zju.acm.mvc.control.annotation.validator.Required;
 
-public class RequiredAction extends ActionBase {
+public class RequiredAction extends TestActionBase {
 
     int intProp;
 
