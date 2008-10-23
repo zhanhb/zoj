@@ -3,13 +3,13 @@ package cn.edu.zju.acm.mvc.control.annotation.validator;
 
 import java.util.Date;
 
-import cn.edu.zju.acm.mvc.control.action.ActionBase;
+import cn.edu.zju.acm.mvc.control.TestActionBase;
 import cn.edu.zju.acm.mvc.control.annotation.validator.DateValidator;
 import cn.edu.zju.acm.mvc.control.annotation.validator.FloatValidator;
 import cn.edu.zju.acm.mvc.control.annotation.validator.IntValidator;
 import cn.edu.zju.acm.mvc.control.annotation.validator.StringValidator;
 
-public class ValidatorInvalidAction extends ActionBase {
+public class ValidatorInvalidAction extends TestActionBase {
 
     String invalidTypeExceptStringProp;
 

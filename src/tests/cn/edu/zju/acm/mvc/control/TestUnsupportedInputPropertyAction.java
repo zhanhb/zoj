@@ -1,12 +1,12 @@
 
-package cn.edu.zju.acm.mvc.control.action;
+package cn.edu.zju.acm.mvc.control;
 
 import java.io.File;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class UnsupportedInputPropertyAction extends ActionBase {
+public class TestUnsupportedInputPropertyAction extends TestActionBase {
 
     private Object objProp;
 

@@ -6,8 +6,6 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -22,6 +20,8 @@ import java.util.regex.PatternSyntaxException;
 import org.apache.commons.beanutils.ConversionException;
 import org.apache.log4j.Logger;
 
+import cn.edu.zju.acm.mvc.control.annotation.Cookie;
+import cn.edu.zju.acm.mvc.control.annotation.Session;
 import cn.edu.zju.acm.mvc.control.annotation.validator.DateValidator;
 import cn.edu.zju.acm.mvc.control.annotation.validator.FloatValidator;
 import cn.edu.zju.acm.mvc.control.annotation.validator.IntValidator;
@@ -41,6 +41,10 @@ public class PropertyDescriptor {
     private Method accessMethod = null;
 
     private boolean required = false;
+
+    private boolean sessionVariable = false;
+
+    private Cookie cookieAnnotation = null;
 
     private List<Annotation> validators = new ArrayList<Annotation>();
 
@@ -77,10 +81,10 @@ public class PropertyDescriptor {
                     propertyDescriptor.owner = actionClass;
                     propertyDescriptor.accessMethod = method;
                     propertyDescriptor.type = propertyType;
-                    if (input) {
-                        propertyDescriptor.fillInputPropertyAttributes();
+                    propertyDescriptor.fillPropertyAttributes(input);
+                    if (propertyDescriptor.sessionVariable || !input || canReadFromParameterValues(propertyType)) {
+                        propertyDescriptorList.add(propertyDescriptor);
                     }
-                    propertyDescriptorList.add(propertyDescriptor);
                 }
             }
         }
@@ -93,10 +97,7 @@ public class PropertyDescriptor {
             return null;
         }
         Type type = getter.getGenericReturnType();
-        if (isValidOutputPropertyType(type)) {
-            return type;
-        }
-        return null;
+        return type;
     }
 
     private static Type determineTypeFromSetter(Method setter) {
@@ -108,16 +109,11 @@ public class PropertyDescriptor {
             return null;
         }
         Type type = parameterTypes[0];
-        if (isValidInputPropertyType(type)) {
-            return type;
-        }
-        return null;
+        return type;
     }
 
     private static final Class<?>[] simplePropertyClasses =
-            new Class<?>[] {int.class, long.class, double.class, boolean.class, Integer.class, Long.class,
-                            Double.class, BigInteger.class, BigDecimal.class, Boolean.class, String.class, Date.class,
-                            File.class};
+            new Class<?>[] {int.class, long.class, double.class, boolean.class, String.class, Date.class, File.class};
 
     private static boolean isSimpleInputPropertyType(Type type) {
         for (Class<?> simplePropertyClass : simplePropertyClasses) {
@@ -128,7 +124,7 @@ public class PropertyDescriptor {
         return false;
     }
 
-    private static boolean isValidInputPropertyType(Type type) {
+    private static boolean canReadFromParameterValues(Type type) {
         if (type instanceof Class) {
             Class<?> clazz = (Class<?>) type;
             if (clazz.isArray()) {
@@ -171,36 +167,21 @@ public class PropertyDescriptor {
         return false;
     }
 
-    private static boolean isValidOutputPropertyType(Type type) {
-        if (type instanceof Class) {
-            return true;
-        }
-        if (type instanceof ParameterizedType) {
-            ParameterizedType pType = (ParameterizedType) type;
-            Type rawType = pType.getRawType();
-            if (rawType instanceof Class) {
-                Class<?> rawClass = (Class<?>) rawType;
-                Type[] typeArgs = pType.getActualTypeArguments();
-                if (Collection.class.isAssignableFrom(rawClass)) {
-                    return typeArgs.length == 1 && isValidOutputPropertyType(typeArgs[0]);
-                } else if (Map.class.isAssignableFrom(rawClass)) {
-                    return typeArgs.length == 2 && isValidOutputPropertyType(typeArgs[0]) &&
-                        isValidOutputPropertyType(typeArgs[1]);
-                }
-            }
-        }
-        return false;
-    }
-
-    private void fillInputPropertyAttributes() {
+    private void fillPropertyAttributes(boolean input) {
         this.determineConversionExceptionClasses(this.type);
         this.determineTypes();
         for (Annotation annotation : this.accessMethod.getAnnotations()) {
             String error = "";
             if (annotation instanceof Required) {
-                this.required = true;
+                if (input) {
+                    this.required = true;
+                } else {
+                    error = "Required only applies to setters";
+                }
             } else if (annotation instanceof IntValidator) {
-                if (!this.isIntType(this.type) && !this.isIntType(this.componentType)) {
+                if (!input) {
+                    error = "IntValidator only applies to setters";
+                } else if (!this.isIntType(this.type) && !this.isIntType(this.componentType)) {
                     error = " IntValidator only appiles to int or int array properties";
                 } else {
                     IntValidator intValidator = (IntValidator) annotation;
@@ -209,7 +190,9 @@ public class PropertyDescriptor {
                     }
                 }
             } else if (annotation instanceof FloatValidator) {
-                if (!this.isFloatType(this.type) && !this.isFloatType(this.componentType)) {
+                if (!input) {
+                    error = "FloatValidator only applies to setters";
+                } else if (!this.isFloatType(this.type) && !this.isFloatType(this.componentType)) {
                     error = " FloatValidator only appiles to double or double array properties";
                 } else {
                     FloatValidator floatValidator = (FloatValidator) annotation;
@@ -218,7 +201,9 @@ public class PropertyDescriptor {
                     }
                 }
             } else if (annotation instanceof StringValidator) {
-                if (!String.class.equals(this.type) && !String.class.equals(this.componentType)) {
+                if (!input) {
+                    error = "StringValidator only applies to setters";
+                } else if (!String.class.equals(this.type) && !String.class.equals(this.componentType)) {
                     error = " StringValidator only appiles to String or String array properties";
                 } else {
                     StringValidator stringValidator = (StringValidator) annotation;
@@ -237,7 +222,9 @@ public class PropertyDescriptor {
                     }
                 }
             } else if (annotation instanceof DateValidator) {
-                if (!Date.class.equals(this.type) && !Date.class.equals(this.componentType)) {
+                if (!input) {
+                    error = "DateValidator only applies to setters";
+                } else if (!Date.class.equals(this.type) && !Date.class.equals(this.componentType)) {
                     error = " DateValidator only appiles to Date or Date array properties";
                 } else {
                     DateValidator dateValidator = (DateValidator) annotation;
@@ -266,14 +253,41 @@ public class PropertyDescriptor {
                         error = " Invalid format value '" + dateValidator.format() + "' " + e.getMessage();
                     }
                 }
+            } else if (annotation instanceof Session) {
+                this.sessionVariable = true;
+            } else if (annotation instanceof Cookie) {
+                if (canReadFromParameterValues(this.type)) {
+                    this.cookieAnnotation = (Cookie) annotation;
+                } else {
+                    error = "Cookie does not apply to properties with type " + this.type;
+                }
             } else {
                 continue;
             }
             if (error.length() == 0) {
-                this.validators.add(annotation);
+                if (!(annotation instanceof Session || annotation instanceof Cookie)) {
+                    this.validators.add(annotation);
+                }
             } else {
                 logger.error(String.format("Invalid %s for %s.%s:%s", annotation.annotationType().getSimpleName(),
                                            this.owner.getName(), this.accessMethod.getName(), error));
+            }
+        }
+        if (this.sessionVariable) {
+            if (this.required) {
+                logger.error(String.format("Session variables should not have Required annotation. Location: %s.%s",
+                                           this.owner.getName(), this.accessMethod.getName()));
+                this.required = false;
+            }
+            if (this.validators.size() > 0) {
+                logger.error(String.format("Session variables should not have any validator. Location: %s.%s",
+                                           this.owner.getName(), this.accessMethod.getName()));
+                this.validators.clear();
+            }
+            if (this.cookieAnnotation != null) {
+                logger.error(String.format("Session variables should not have Cookie annotation. Location: %s.%s",
+                                           this.owner.getName(), this.accessMethod.getName()));
+                this.cookieAnnotation = null;
             }
         }
     }
@@ -337,6 +351,14 @@ public class PropertyDescriptor {
 
     public boolean isRequired() {
         return this.required;
+    }
+
+    public boolean isSessionVariable() {
+        return this.sessionVariable;
+    }
+
+    public Cookie getCookieAnnotation() {
+        return this.cookieAnnotation;
     }
 
     public List<Annotation> getValidators() {

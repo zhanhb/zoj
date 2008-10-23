@@ -1,10 +1,10 @@
 
 package cn.edu.zju.acm.mvc.control.annotation.validator;
 
-import cn.edu.zju.acm.mvc.control.action.ActionBase;
+import cn.edu.zju.acm.mvc.control.TestActionBase;
 import cn.edu.zju.acm.mvc.control.annotation.validator.FloatValidator;
 
-public class FloatValidatorAction extends ActionBase {
+public class FloatValidatorAction extends TestActionBase {
 
     double doubleProp;
 

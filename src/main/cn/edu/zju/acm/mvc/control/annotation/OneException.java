@@ -12,5 +12,5 @@ public @interface OneException {
 
     Class<? extends Throwable> exception();
 
-    String result() default "exception";
+    String result();
 }

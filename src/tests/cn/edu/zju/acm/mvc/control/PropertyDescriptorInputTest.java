@@ -1,25 +1,60 @@
 
 package cn.edu.zju.acm.mvc.control;
 
+import static org.hamcrest.core.Is.is;
+import static org.hamcrest.core.IsNull.notNullValue;
+import static org.junit.Assert.assertThat;
+
 import java.io.File;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 import org.apache.commons.beanutils.ConversionException;
+import org.hamcrest.core.IsEqual;
 import org.junit.Before;
 import org.junit.Test;
 
-import cn.edu.zju.acm.mvc.control.action.PropertyAction;
 
 public class PropertyDescriptorInputTest extends PropertyDescriptorTest {
+
+    protected boolean required;
+
+    protected List<Annotation> validators;
+
+    protected Class<?> rawType;
+
+    protected Class<?> componentType;
+
+    protected List<Class<? extends Exception>> conversionExceptionClasses;
 
     @Before
     public void setUp() {
         super.setUp();
-        this.owner = PropertyAction.class;
+        this.required = false;
+        this.validators = new ArrayList<Annotation>();
+        this.rawType = null;
+        this.componentType = null;
+        this.conversionExceptionClasses = new ArrayList<Class<? extends Exception>>();
+        this.owner = InputPropertyAction.class;
     }
 
     protected void check() {
-        super.check(PropertyDescriptor.getInputProperties(this.owner));
+        List<PropertyDescriptor> propertyDescriptorList = PropertyDescriptor.getInputProperties(this.owner);
+        PropertyDescriptor propertyDescriptor = this.getPropertyDescriptor(propertyDescriptorList);
+        assertThat("Invalid raw type", propertyDescriptor.getRawType(), is(new IsEqual<Class<?>>(this.rawType)));
+        assertThat("Invalid component type", propertyDescriptor.getComponentType(),
+                   is(new IsEqual<Class<?>>(this.componentType)));
+        assertThat("Invalid access method", propertyDescriptor.getAccessMethod(), notNullValue());
+        assertThat("Invalid name", propertyDescriptor.getName(), is(this.name));
+        assertThat("Invalid owner", propertyDescriptor.getOwner(), is(new IsEqual<Class<?>>(this.owner)));
+        assertThat("Invalid possibleExceptionClass", propertyDescriptor.getConversionExceptionClasses(),
+                   is(new IsEqual<List<Class<? extends Exception>>>(this.conversionExceptionClasses)));
+        assertThat("Invalid type", propertyDescriptor.getType(), is(new IsEqual<Type>(this.type)));
+        assertThat("Invalid validators", propertyDescriptor.getValidators(), is(this.validators));
+        assertThat("Invalid required", propertyDescriptor.isRequired(), is(this.required));
     }
 
     @Test
