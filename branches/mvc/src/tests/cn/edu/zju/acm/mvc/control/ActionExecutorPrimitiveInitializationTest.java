@@ -5,9 +5,10 @@ import org.junit.Before;
 import org.junit.Test;
 
 
+
 public class ActionExecutorPrimitiveInitializationTest extends ActionExecutorTestBase {
 
-    private ActionExecutor actionExecutor;
+    private ActionProxy actionExecutor;
 
     @Before
     public void setUp() throws Exception {
