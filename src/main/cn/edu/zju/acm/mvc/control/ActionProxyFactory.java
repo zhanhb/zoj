@@ -3,17 +3,18 @@ package cn.edu.zju.acm.mvc.control;
 
 import org.apache.log4j.Logger;
 
-public class ActionExecutorFactory {
 
-    private Class<? extends ActionExecutor> clazz;
+public class ActionProxyFactory {
 
-    private Logger logger = Logger.getLogger(ActionExecutorFactory.class);
+    private Class<? extends ActionProxy> clazz;
 
-    public ActionExecutorFactory(ActionDescriptor actionDescriptor, boolean debugMode) {
-        this.clazz = new ActionExecutorBuilder().build(actionDescriptor, debugMode);
+    private Logger logger = Logger.getLogger(ActionProxyFactory.class);
+
+    public ActionProxyFactory(ActionDescriptor actionDescriptor, boolean debugMode) {
+        this.clazz = new ActionProxyBuilder().build(actionDescriptor, debugMode);
     }
 
-    public ActionExecutor newInstance() throws ActionInstantiationException {
+    public ActionProxy newInstance() throws ActionInstantiationException {
         try {
             return clazz.newInstance();
         } catch (InstantiationException e) {

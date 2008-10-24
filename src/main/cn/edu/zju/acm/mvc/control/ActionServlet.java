@@ -16,9 +16,10 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.log4j.Logger;
 
+
 public class ActionServlet extends HttpServlet {
 
-    private Map<String, ActionExecutorFactory> actionFactoryMap = new HashMap<String, ActionExecutorFactory>();
+    private Map<String, ActionProxyFactory> actionFactoryMap = new HashMap<String, ActionProxyFactory>();
 
     private Logger logger = Logger.getLogger(ActionServlet.class);
 
@@ -96,19 +97,19 @@ public class ActionServlet extends HttpServlet {
                     return false;
                 }
             });
-            this.actionFactoryMap.put(key, new ActionExecutorFactory(actionDescriptor, debugMode != null));
+            this.actionFactoryMap.put(key, new ActionProxyFactory(actionDescriptor, debugMode != null));
         }
     }
 
     private void process(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         String path = req.getServletPath();
         for (boolean forward = false;; forward = true) {
-            ActionExecutorFactory actionFactory = this.actionFactoryMap.get(path);
+            ActionProxyFactory actionFactory = this.actionFactoryMap.get(path);
             if (actionFactory == null) {
                 resp.sendError(404);
             } else {
                 try {
-                    ActionExecutor action = actionFactory.newInstance();
+                    ActionProxy action = actionFactory.newInstance();
                     String result = action.execute(req, resp, forward);
                     if (result.endsWith(".jsp")) {
                         req.getRequestDispatcher(result).forward(req, resp);

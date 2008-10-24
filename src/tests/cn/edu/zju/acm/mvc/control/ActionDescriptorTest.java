@@ -45,9 +45,10 @@ public class ActionDescriptorTest {
         Iterator<Result> iterator = resultMap.values().iterator();
         Result result = iterator.next();
         assertThat(result, notNullValue());
-        assertThat(result.name(), is("redirect"));
-        assertThat(result.value(), is("/test"));
-        assertThat(result.type(), is(ResultType.Redirect));
+        assertThat(result, notNullValue());
+        assertThat(result.name(), is("jsp"));
+        assertThat(result.value(), is("test.jsp"));
+        assertThat(result.type(), is(ResultType.Jsp));
         
         result = iterator.next();
         assertThat(result, notNullValue());
@@ -56,10 +57,9 @@ public class ActionDescriptorTest {
         assertThat(result.type(), is(ResultType.Raw));
         
         result = iterator.next();
-        assertThat(result, notNullValue());
-        assertThat(result.name(), is("jsp"));
-        assertThat(result.value(), is("test.jsp"));
-        assertThat(result.type(), is(ResultType.Jsp));
+        assertThat(result.name(), is("redirect"));
+        assertThat(result.value(), is("/test"));
+        assertThat(result.type(), is(ResultType.Redirect));
     }
     
     @Test
@@ -80,15 +80,15 @@ public class ActionDescriptorTest {
         
         result = iterator.next();
         assertThat(result, notNullValue());
-        assertThat(result.name(), is("redirect"));
-        assertThat(result.value(), is("/test"));
-        assertThat(result.type(), is(ResultType.Redirect));
-        
-        result = iterator.next();
-        assertThat(result, notNullValue());
         assertThat(result.name(), is("raw"));
         assertThat(result.value(), is("out"));
         assertThat(result.type(), is(ResultType.Raw));
+        
+        result = iterator.next();
+        assertThat(result, notNullValue());
+        assertThat(result.name(), is("redirect"));
+        assertThat(result.value(), is("/test"));
+        assertThat(result.type(), is(ResultType.Redirect));
     }
     
     @Test
@@ -103,8 +103,8 @@ public class ActionDescriptorTest {
         Result result = resultMap.get("test");
         assertThat(result, notNullValue());
         assertThat(result.name(), is("test"));
-        assertThat(result.value(), is("/test"));
-        assertThat(result.type(), is(ResultType.Redirect));
+        assertThat(result.value(), is("test.jsp"));
+        assertThat(result.type(), is(ResultType.Jsp));
     }
     
     @Test
@@ -149,12 +149,12 @@ public class ActionDescriptorTest {
         Iterator<OneException> iterator = exceptionMap.values().iterator();
         OneException exception = iterator.next();
         assertThat(exception, notNullValue());
-        assertThat(exception.exception(), is(new IsEqual<Class<?>>(NullPointerException.class)));
+        assertThat(exception.exception(), is(new IsEqual<Class<?>>(IllegalArgumentException.class)));
         assertThat(exception.result(), is("jsp"));
         
         exception = iterator.next();
         assertThat(exception, notNullValue());
-        assertThat(exception.exception(), is(new IsEqual<Class<?>>(IllegalArgumentException.class)));
+        assertThat(exception.exception(), is(new IsEqual<Class<?>>(NullPointerException.class)));
         assertThat(exception.result(), is("jsp"));
     }
     

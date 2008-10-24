@@ -3,6 +3,7 @@ package cn.edu.zju.acm.mvc.control;
 
 import org.junit.Before;
 
+
 public class ActionExecutorTestBase {
 
     protected MockHttpServletRequest req;
@@ -15,7 +16,7 @@ public class ActionExecutorTestBase {
         this.resp = new MockHttpServletResponse();
     }
 
-    public ActionExecutor build(Class<? extends Action> clazz) throws InstantiationException, IllegalAccessException {
-        return new ActionExecutorBuilder().build(new ActionDescriptor(clazz), true).newInstance();
+    public ActionProxy build(Class<? extends Action> clazz) throws InstantiationException, IllegalAccessException {
+        return new ActionProxyBuilder().build(new ActionDescriptor(clazz), true).newInstance();
     }
 }

@@ -4,11 +4,8 @@ package cn.edu.zju.acm.mvc.control;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
@@ -18,7 +15,6 @@ import cn.edu.zju.acm.mvc.control.annotation.OneException;
 import cn.edu.zju.acm.mvc.control.annotation.Result;
 import cn.edu.zju.acm.mvc.control.annotation.ResultType;
 import cn.edu.zju.acm.mvc.control.annotation.Results;
-import cn.edu.zju.acm.onlinejudge.util.Pair;
 
 public class ActionDescriptor {
 
@@ -68,8 +64,6 @@ public class ActionDescriptor {
         }
         this.initResultMap();
         this.initExecpetionMap();
-        this.removeInvalidResults();
-        this.removeInvalidExceptions();
         if (this.resultMap.size() == 0) {
             this.logger.error("No results defined for action class " + actionClass.getName());
         }
@@ -103,126 +97,91 @@ public class ActionDescriptor {
         return this.outputPropertyMap;
     }
 
-    private void getResultList(Class<?> clazz, List<Pair<Result, Class<?>>> resultList) {
-        if (!Action.class.equals(clazz)) {
-            this.getResultList(clazz.getSuperclass(), resultList);
-        }
-        for (Annotation annotation : clazz.getAnnotations()) {
-            if (annotation instanceof Results) {
-                for (Result result : ((Results) annotation).value()) {
-                    resultList.add(new Pair<Result, Class<?>>(result, clazz));
-                }
-            } else if (annotation instanceof Result) {
-                resultList.add(new Pair<Result, Class<?>>((Result) annotation, clazz));
-            }
-        }
-    }
-
-    private void getExceptoinList(Class<?> clazz, List<Pair<OneException, Class<?>>> exceptionList) {
-        if (!Action.class.equals(clazz)) {
-            this.getExceptoinList(clazz.getSuperclass(), exceptionList);
-        }
-        for (Annotation annotation : clazz.getAnnotations()) {
-            if (annotation instanceof Exceptions) {
-                for (OneException exception : ((Exceptions) annotation).value()) {
-                    exceptionList.add(new Pair<OneException, Class<?>>(exception, clazz));
-                }
-            } else if (annotation instanceof OneException) {
-                exceptionList.add(new Pair<OneException, Class<?>>((OneException) annotation, clazz));
-            }
-        }
-    }
-
     private void initResultMap() {
-        List<Pair<Result, Class<?>>> tempResultList = new ArrayList<Pair<Result, Class<?>>>();
-        this.getResultList(this.actionClass, tempResultList);
-        for (ListIterator<Pair<Result, Class<?>>> iter = tempResultList.listIterator(tempResultList.size()); iter
-                                                                                                                 .hasPrevious();) {
-            Pair<Result, Class<?>> pair = iter.previous();
-            Result result = pair.getFirst();
-            Class<?> clazz = pair.getSecond();
-            String resultName = result.name();
-            Result oldResult = this.resultMap.get(resultName);
-            if (oldResult == null) {
-                this.resultMap.put(resultName, result);
-                this.resultClassMap.put(result, clazz);
-            } else {
-                Class<?> oldClazz = this.resultClassMap.get(oldResult);
-                if (clazz.equals(oldClazz)) {
-                    this.logger.error(String.format("Duplicate result name \"%s\" in %s", resultName, clazz.getName()));
-                } else {
-                    this.logger.debug(String.format("%s@%s is overridden by %s@%s", result.toString(), clazz.getName(),
-                                                    oldResult.toString(), oldClazz.getName()));
+        for (Class<?> clazz = this.actionClass; !Action.class.equals(clazz); clazz = clazz.getSuperclass()) {
+            for (Annotation annotation : clazz.getAnnotations()) {
+                if (annotation instanceof Results) {
+                    for (Result result : ((Results) annotation).value()) {
+                        this.addResult(clazz, result);
+                    }
+                } else if (annotation instanceof Result) {
+                    this.addResult(clazz, (Result) annotation);
                 }
             }
         }
     }
-
-    private void removeInvalidResults() {
-        List<String> invalidResultList = new ArrayList<String>();
-        for (Result result : this.resultMap.values()) {
-            if (result.type() == ResultType.Raw) {
-                PropertyDescriptor propertyDescriptor = this.outputPropertyMap.get(result.value());
-                if (propertyDescriptor == null) {
-                    this.logger.error(String.format("Invalid result %s@%s. No output property \"%s\" found.",
-                                                    result.toString(), this.resultClassMap.get(result).getName(),
-                                                    result.value()));
-                    invalidResultList.add(result.name());
-                } else if (!InputStream.class.isAssignableFrom(propertyDescriptor.getRawType())) {
-                    this.logger.error(String.format("Invalid result %s@%s. Property \"%s\" should be InputStream.",
-                                                    result.toString(), this.resultClassMap.get(result).getName(),
-                                                    result.value()));
-                    invalidResultList.add(result.name());
-                }
+    
+    private void addResult(Class<?> clazz, Result result) {
+        if (result.type() == ResultType.Raw) {
+            PropertyDescriptor propertyDescriptor = this.outputPropertyMap.get(result.value());
+            if (propertyDescriptor == null) {
+                this.logger.error(String.format("Invalid result %s@%s. No output property \"%s\" found.",
+                                                result.toString(), clazz.getName(), result.value()));
+                return;
+            } else if (!InputStream.class.isAssignableFrom(propertyDescriptor.getRawType())) {
+                this.logger.error(String.format("Invalid result %s@%s. Property \"%s\" should be InputStream.",
+                                                result.toString(), clazz.getName(), result.value()));
+                return;
             }
         }
-        for (String resultName : invalidResultList) {
-            this.resultMap.remove(resultName);
+        
+        String resultName = result.name();
+        Result oldResult = this.resultMap.get(resultName);
+        if (oldResult == null) {
+            this.resultMap.put(resultName, result);
+            this.resultClassMap.put(result, clazz);
+        } else {
+            Class<?> oldClazz = this.resultClassMap.get(oldResult);
+            if (clazz.equals(oldClazz)) {
+                this.logger.error(String.format("Duplicate result name \"%s\" in %s", resultName,
+                                                clazz.getName()));
+            } else {
+                this.logger.debug(String.format("%s@%s is overridden by %s@%s", result.toString(),
+                                                clazz.getName(), oldResult.toString(), oldClazz.getName()));
+            }
         }
     }
 
     private void initExecpetionMap() {
-        List<Pair<OneException, Class<?>>> tempExceptionList = new ArrayList<Pair<OneException, Class<?>>>();
-        this.getExceptoinList(this.actionClass, tempExceptionList);
-        for (ListIterator<Pair<OneException, Class<?>>> iter = tempExceptionList.listIterator(tempExceptionList.size()); iter
-                                                                                                                             .hasPrevious();) {
-            Pair<OneException, Class<?>> pair = iter.previous();
-            OneException exception = pair.getFirst();
-            Class<?> clazz = pair.getSecond();
-            Class<? extends Throwable> exceptionClass = exception.exception();
-            boolean overridden = false;
-            for (OneException oldException : this.exceptionMap.values()) {
-                if (oldException.exception().isAssignableFrom(exceptionClass)) {
-                    Class<?> oldClazz = this.exceptionClassMap.get(oldException);
-                    if (clazz.equals(oldClazz)) {
-                        this.logger.error(String.format("%s: %s is overridden by %s", clazz.getName(),
-                                                        exception.toString(), oldException.toString()));
-                    } else {
-                        this.logger.debug(String.format("%s@%s is overridden by %s@%s", exception.toString(),
-                                                        clazz.getName(), oldException.toString(), oldClazz.getName()));
+        for (Class<?> clazz = this.actionClass; !Action.class.equals(clazz); clazz = clazz.getSuperclass()) {
+            for (Annotation annotation : clazz.getAnnotations()) {
+                if (annotation instanceof Exceptions) {
+                    for (OneException exception : ((Exceptions) annotation).value()) {
+                        this.addException(clazz, exception);
                     }
-                    overridden = true;
-                    break;
+                } else if (annotation instanceof OneException) {
+                    this.addException(clazz, (OneException) annotation);
                 }
-            }
-            if (!overridden) {
-                this.exceptionMap.put(exceptionClass, exception);
-                this.exceptionClassMap.put(exception, clazz);
             }
         }
     }
-
-    private void removeInvalidExceptions() {
-        List<Class<? extends Throwable>> invalidExceptionList = new ArrayList<Class<? extends Throwable>>();
-        for (OneException excepiton : this.exceptionMap.values()) {
-            if (!this.resultMap.containsKey(excepiton.result())) {
-                this.logger.error(String.format("Invalid result in %s@%s", excepiton.toString(),
-                                                this.exceptionClassMap.get(excepiton).getName()));
-                invalidExceptionList.add(excepiton.exception());
+    
+    private void addException(Class<?> clazz, OneException exception) {
+        if (!this.resultMap.containsKey(exception.result())) {
+            this.logger.error(String.format("Invalid result in %s@%s", exception.toString(), clazz.getName()));
+            return;
+        }
+        
+        Class<? extends Throwable> exceptionClass = exception.exception();
+        boolean overridden = false;
+        for (OneException oldException : this.exceptionMap.values()) {
+            if (oldException.exception().isAssignableFrom(exceptionClass)) {
+                Class<?> oldClazz = this.exceptionClassMap.get(oldException);
+                if (clazz.equals(oldClazz)) {
+                    this.logger.error(String.format("%s: %s is overridden by %s", clazz.getName(),
+                                                    exception.toString(), oldException.toString()));
+                } else {
+                    this.logger.debug(String.format("%s@%s is overridden by %s@%s", exception.toString(),
+                                                    clazz.getName(), oldException.toString(),
+                                                    oldClazz.getName()));
+                }
+                overridden = true;
+                break;
             }
         }
-        for (Class<? extends Throwable> exceptionClass : invalidExceptionList) {
-            this.exceptionMap.remove(exceptionClass);
+        if (!overridden) {
+            this.exceptionMap.put(exceptionClass, exception);
+            this.exceptionClassMap.put(exception, clazz);
         }
     }
 }
