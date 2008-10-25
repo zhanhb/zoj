@@ -11,7 +11,7 @@ import java.util.Map;
 
 public class PropertyDescriptorTest {
 
-    protected Class<? extends Action> owner;
+    protected ActionDescriptor owner;
 
     protected String name;
 

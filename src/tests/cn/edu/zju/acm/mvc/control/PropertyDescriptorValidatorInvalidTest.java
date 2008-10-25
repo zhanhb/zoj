@@ -16,8 +16,8 @@ public class PropertyDescriptorValidatorInvalidTest extends PropertyDescriptorTe
     @Test
     public void test() {
         List<PropertyDescriptor> propertyDescriptorList =
-                PropertyDescriptor.getInputProperties(ValidatorInvalidAction.class);
-        assertThat(propertyDescriptorList.size(), is(11));
+                PropertyDescriptor.getInputProperties(new MockActionDescriptor(ValidatorInvalidAction.class));
+        assertThat(propertyDescriptorList.size(), is(7));
         for (PropertyDescriptor propertyDescriptor : propertyDescriptorList) {
             List<Annotation> annotationList = propertyDescriptor.getValidators();
             assertThat(annotationList.size(), is(0));

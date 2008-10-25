@@ -10,7 +10,7 @@ import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 
-import cn.edu.zju.acm.mvc.control.annotation.validator.IntValidator;
+import cn.edu.zju.acm.mvc.control.annotation.validator.IntRangeValidator;
 import cn.edu.zju.acm.mvc.control.annotation.validator.IntValidatorAction;
 
 public class PropertyDescriptorIntValidatorTest extends PropertyDescriptorTest {
@@ -29,11 +29,14 @@ public class PropertyDescriptorIntValidatorTest extends PropertyDescriptorTest {
     public void check(String name) {
         this.name = name;
         PropertyDescriptor propertyDescriptor =
-                this.getPropertyDescriptor(PropertyDescriptor.getInputProperties(IntValidatorAction.class));
+                this
+                    .getPropertyDescriptor(PropertyDescriptor
+                                                             .getInputProperties(new MockActionDescriptor(
+                                                                                                          IntValidatorAction.class)));
         List<Annotation> annotationList = propertyDescriptor.getValidators();
         assertThat(annotationList.size(), is(1));
-        assertThat(annotationList.get(0), is(IntValidator.class));
-        IntValidator validator = (IntValidator) annotationList.get(0);
+        assertThat(annotationList.get(0), is(IntRangeValidator.class));
+        IntRangeValidator validator = (IntRangeValidator) annotationList.get(0);
         assertThat(validator.min(), is(this.min));
         assertThat(validator.max(), is(this.max));
     }

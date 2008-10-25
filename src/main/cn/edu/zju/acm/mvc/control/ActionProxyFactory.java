@@ -10,8 +10,8 @@ public class ActionProxyFactory {
 
     private Logger logger = Logger.getLogger(ActionProxyFactory.class);
 
-    public ActionProxyFactory(ActionDescriptor actionDescriptor, boolean debugMode) {
-        this.clazz = new ActionProxyBuilder().build(actionDescriptor, debugMode);
+    public ActionProxyFactory(ActionDescriptor actionDescriptor, String defaultDateFormat, boolean debugMode) {
+        this.clazz = new ActionProxyBuilder().build(actionDescriptor, defaultDateFormat, debugMode);
     }
 
     public ActionProxy newInstance() throws ActionInstantiationException {

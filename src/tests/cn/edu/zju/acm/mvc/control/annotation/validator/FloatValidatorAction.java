@@ -2,7 +2,7 @@
 package cn.edu.zju.acm.mvc.control.annotation.validator;
 
 import cn.edu.zju.acm.mvc.control.TestActionBase;
-import cn.edu.zju.acm.mvc.control.annotation.validator.FloatValidator;
+import cn.edu.zju.acm.mvc.control.annotation.validator.FloatRangeValidator;
 
 public class FloatValidatorAction extends TestActionBase {
 
@@ -14,22 +14,22 @@ public class FloatValidatorAction extends TestActionBase {
 
     double maxProp;
 
-    @FloatValidator
+    @FloatRangeValidator
     public void setDoubleProp(double doubleProp) {
         this.doubleProp = doubleProp;
     }
 
-    @FloatValidator
+    @FloatRangeValidator
     public void setDoubleArrayProp(double[] doubleArrayProp) {
         this.doubleArrayProp = doubleArrayProp;
     }
 
-    @FloatValidator(min = 1.0)
+    @FloatRangeValidator(min = 1.0)
     public void setMinProp(double minProp) {
         this.minProp = minProp;
     }
 
-    @FloatValidator(max = 2.0)
+    @FloatRangeValidator(max = 2.0)
     public void setMaxProp(double maxProp) {
         this.maxProp = maxProp;
     }

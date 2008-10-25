@@ -11,12 +11,12 @@ import org.junit.runners.Suite;
     PropertyDescriptorUnsupportedPropertyInputTest.class,
     PropertyDescriptorIntValidatorTest.class,
     PropertyDescriptorFloatValidatorTest.class,
-    PropertyDescriptorStringValidatorTest.class,
-    PropertyDescriptorDateValidatorTest.class,
+    PropertyDescriptorStringLengthValidatorTest.class,
     PropertyDescriptorRequiredValidatorTest.class,
     PropertyDescriptorValidatorInvalidTest.class,
     PropertyDescriptorSessionTest.class,
     PropertyDescriptorCookieTest.class,
+    PropertyDescriptorConversionErrorTest.class,
 })
 public class PropertyDescriptorTestSuite {
 

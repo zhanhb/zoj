@@ -8,6 +8,7 @@ import static org.junit.Assert.assertThat;
 import java.io.File;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Type;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -17,10 +18,7 @@ import org.hamcrest.core.IsEqual;
 import org.junit.Before;
 import org.junit.Test;
 
-
 public class PropertyDescriptorInputTest extends PropertyDescriptorTest {
-
-    protected boolean required;
 
     protected List<Annotation> validators;
 
@@ -33,12 +31,11 @@ public class PropertyDescriptorInputTest extends PropertyDescriptorTest {
     @Before
     public void setUp() {
         super.setUp();
-        this.required = false;
         this.validators = new ArrayList<Annotation>();
         this.rawType = null;
         this.componentType = null;
         this.conversionExceptionClasses = new ArrayList<Class<? extends Exception>>();
-        this.owner = InputPropertyAction.class;
+        this.owner = new MockActionDescriptor(TestInputPropertyAction.class);
     }
 
     protected void check() {
@@ -49,12 +46,12 @@ public class PropertyDescriptorInputTest extends PropertyDescriptorTest {
                    is(new IsEqual<Class<?>>(this.componentType)));
         assertThat("Invalid access method", propertyDescriptor.getAccessMethod(), notNullValue());
         assertThat("Invalid name", propertyDescriptor.getName(), is(this.name));
-        assertThat("Invalid owner", propertyDescriptor.getOwner(), is(new IsEqual<Class<?>>(this.owner)));
+        assertThat("Invalid owner", propertyDescriptor.getActionDescriptor(),
+                   is(new IsEqual<ActionDescriptor>(this.owner)));
         assertThat("Invalid possibleExceptionClass", propertyDescriptor.getConversionExceptionClasses(),
                    is(new IsEqual<List<Class<? extends Exception>>>(this.conversionExceptionClasses)));
         assertThat("Invalid type", propertyDescriptor.getType(), is(new IsEqual<Type>(this.type)));
         assertThat("Invalid validators", propertyDescriptor.getValidators(), is(this.validators));
-        assertThat("Invalid required", propertyDescriptor.isRequired(), is(this.required));
     }
 
     @Test
@@ -126,7 +123,7 @@ public class PropertyDescriptorInputTest extends PropertyDescriptorTest {
     public void testDate() {
         this.type = this.rawType = Date.class;
         this.name = "dateProp";
-        this.conversionExceptionClasses.add(ConversionException.class);
+        this.conversionExceptionClasses.add(ParseException.class);
         this.check();
     }
 
@@ -135,14 +132,6 @@ public class PropertyDescriptorInputTest extends PropertyDescriptorTest {
         this.type = this.rawType = File.class;
         this.name = "fileProp";
         // this.conversionExceptionClasses = new Class[] {ConversionException.class};
-        this.check();
-    }
-
-    @Test
-    public void testBooleanArray() {
-        this.type = this.rawType = boolean[].class;
-        this.componentType = boolean.class;
-        this.name = "booleanArrayProp";
         this.check();
     }
 
@@ -159,7 +148,7 @@ public class PropertyDescriptorInputTest extends PropertyDescriptorTest {
         this.type = this.rawType = Date[].class;
         this.componentType = Date.class;
         this.name = "dateArrayProp";
-        this.conversionExceptionClasses.add(ConversionException.class);
+        this.conversionExceptionClasses.add(ParseException.class);
         this.check();
     }
 }
