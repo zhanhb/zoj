@@ -2,18 +2,21 @@
 package cn.edu.zju.acm.mvc.control;
 
 import java.io.File;
+import java.io.InputStream;
 import java.lang.reflect.Method;
-import java.sql.Date;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletOutputStream;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -27,13 +30,14 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
+import cn.edu.zju.acm.mvc.control.annotation.Header;
 import cn.edu.zju.acm.mvc.control.annotation.OneException;
 import cn.edu.zju.acm.mvc.control.annotation.Result;
-import cn.edu.zju.acm.onlinejudge.util.Pair;
+import cn.edu.zju.acm.mvc.control.annotation.ResultType;
 
 public class ActionProxyBuilder {
 
-    private static ActionProxyClassLoader actionExecutorClassLoader = new ActionProxyClassLoader();
+    private static ActionProxyClassLoader actionProxyClassLoader = new ActionProxyClassLoader();
 
     private Logger logger = Logger.getLogger(ActionProxyBuilder.class);
 
@@ -63,8 +67,14 @@ public class ActionProxyBuilder {
 
     private ActionDescriptor actionDescriptor;
 
-    public Class<? extends ActionProxy> build(ActionDescriptor actionDescriptor, boolean debugMode) {
+    private byte[] classContent;
+
+    private String defaultDateFormat;
+
+    public Class<? extends ActionProxy> build(ActionDescriptor actionDescriptor, String defaultDateFormat,
+                                              boolean debugMode) {
         this.actionDescriptor = actionDescriptor;
+        this.defaultDateFormat = defaultDateFormat;
         this.actionClass = actionDescriptor.getActionClass();
         this.debugMode = debugMode;
         this.cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -83,8 +93,13 @@ public class ActionProxyBuilder {
         this.buildConstructor(this.parentInternalName, this.internalName, debugMode);
         this.buildExecute();
         this.cw.visitEnd();
-        return ActionProxyBuilder.actionExecutorClassLoader.defineClass(this.actionClass.getName() + "Proxy",
-                                                                        this.cw.toByteArray());
+        classContent = this.cw.toByteArray();
+        return ActionProxyBuilder.actionProxyClassLoader
+                                                        .defineClass(this.actionClass.getName() + "Proxy", classContent);
+    }
+
+    byte[] getClassContent() {
+        return this.classContent;
     }
 
     private void buildConstructor(String parentInternalName, String internalName, boolean debugMode) {
@@ -105,6 +120,7 @@ public class ActionProxyBuilder {
         }
 
         mv.visitInsn(Opcodes.RETURN);
+        mv.visitMaxs(0, 0);
         mv.visitEnd();
     }
 
@@ -112,7 +128,7 @@ public class ActionProxyBuilder {
         // public String execute(HttpServletRequest req, HttpServletResponse resp) throws Exception {
         MethodVisitor mv =
                 this.cw.visitMethod(Opcodes.ACC_PUBLIC, "execute",
-                                    MethodInvocationUtil.getMethodDescriptor(String.class, HttpServletRequest.class,
+                                    MethodInvocationUtil.getMethodDescriptor(void.class, HttpServletRequest.class,
                                                                              HttpServletResponse.class), null,
                                     new String[] {Type.getInternalName(Exception.class)});
         mv.visitCode();
@@ -139,15 +155,15 @@ public class ActionProxyBuilder {
         }
         // start_try_catch:
         mv.visitLabel(startTryCatchLabel);
-        
+
         this.initializeProperties(mv);
-        
+
         // result = super.execute()
         mv.visitVarInsn(Opcodes.ALOAD, THIS);
         mv.visitMethodInsn(Opcodes.INVOKESPECIAL, this.internalName, "execute",
                            MethodInvocationUtil.getMethodDescriptor(Action.class, "execute"));
         mv.visitVarInsn(Opcodes.ASTORE, RESULT);
-        
+
         for (int i = 0; i < exceptionList.size(); ++i) {
             // goto end_try_catch
             mv.visitJumpInsn(Opcodes.GOTO, endTryCatchLabel);
@@ -167,7 +183,36 @@ public class ActionProxyBuilder {
         // end_try_catch:
         mv.visitLabel(endTryCatchLabel);
 
+        this.dispatchResult(mv);
+
+        mv.visitInsn(Opcodes.RETURN);
+        mv.visitMaxs(0, 0);
         mv.visitEnd();
+    }
+
+    private void initializeSession(MethodVisitor mv) {
+        boolean requireSession = false;
+        for (PropertyDescriptor propertyDescriptor : this.actionDescriptor.getInputPropertyMap().values()) {
+            if (propertyDescriptor.isSessionVariable()) {
+                requireSession = true;
+                break;
+            }
+        }
+        if (!requireSession) {
+            for (PropertyDescriptor propertyDescriptor : this.actionDescriptor.getOutputPropertyMap().values()) {
+                if (propertyDescriptor.isSessionVariable()) {
+                    requireSession = true;
+                    break;
+                }
+            }
+        }
+        if (requireSession) {
+            // HttpSession session = req.getSession();
+            this.session = this.variableIndex++;
+            mv.visitVarInsn(Opcodes.ALOAD, REQ);
+            MethodInvocationUtil.invokeInterface(mv, HttpServletRequest.class, "getSession");
+            mv.visitVarInsn(Opcodes.ASTORE, this.session);
+        }
     }
 
     private void initializeCookieMap(MethodVisitor mv) {
@@ -250,6 +295,24 @@ public class ActionProxyBuilder {
                 this.initializeNonSessionProperty(mv, propertyDescriptor);
             }
         }
+
+        Label noErrorLabel = new Label();
+
+        // if (this.getFieldErrors().size() == 0) goto no_error
+        mv.visitVarInsn(Opcodes.ALOAD, THIS);
+        MethodInvocationUtil.invokeVirtual(mv, Action.class, "getFieldErrors");
+        MethodInvocationUtil.invokeInterface(mv, List.class, "size");
+        mv.visitInsn(Opcodes.ICONST_0);
+        mv.visitJumpInsn(Opcodes.IF_ICMPEQ, noErrorLabel);
+
+        // throw new FieldInitializationErrorException();
+        mv.visitTypeInsn(Opcodes.NEW, Type.getInternalName(FieldInitializationErrorException.class));
+        mv.visitInsn(Opcodes.DUP);
+        MethodInvocationUtil.invokeConstructor(mv, FieldInitializationErrorException.class);
+        mv.visitInsn(Opcodes.ATHROW);
+
+        // no_error
+        mv.visitLabel(noErrorLabel);
     }
 
     private void logInitialization(MethodVisitor mv, String propertyName, String source, int value) {
@@ -267,8 +330,8 @@ public class ActionProxyBuilder {
 
     private void initializeSessionProperty(MethodVisitor mv, PropertyDescriptor propertyDescriptor) {
         // this.setXXX(session.getAttribute("..."))
-        mv.visitVarInsn(Opcodes.ILOAD, THIS);
-        mv.visitVarInsn(Opcodes.ILOAD, this.session);
+        mv.visitVarInsn(Opcodes.ALOAD, THIS);
+        mv.visitVarInsn(Opcodes.ALOAD, this.session);
         mv.visitLdcInsn(propertyDescriptor.getName());
         MethodInvocationUtil.invokeInterface(mv, HttpSession.class, "getAttribute", String.class);
         if (this.debugMode) {
@@ -285,7 +348,7 @@ public class ActionProxyBuilder {
             mv.visitTypeInsn(Opcodes.CHECKCAST, Type.getInternalName(rawType));
         }
         Method method = propertyDescriptor.getAccessMethod();
-        MethodInvocationUtil.invokeVirtual(mv, this.internalName, method.getReturnType(), method.getName(),
+        MethodInvocationUtil.invokeVirtual(mv, this.actionClass, method.getReturnType(), method.getName(),
                                            method.getParameterTypes());
     }
 
@@ -319,13 +382,50 @@ public class ActionProxyBuilder {
         // if (value == null) goto null
         mv.visitJumpInsn(Opcodes.IFNULL, nullLabel);
 
-        mv.visitVarInsn(Opcodes.ILOAD, THIS);
+        Label startTryCatchLabel = new Label();
+        Label endTryCatchLabel = new Label();
+        List<Label> labelList = new ArrayList<Label>();
+        List<Class<? extends Exception>> exceptionList = propertyDescriptor.getConversionExceptionClasses();
+        for (Class<? extends Exception> exception : exceptionList) {
+            Label label = new Label();
+            labelList.add(label);
+            mv.visitTryCatchBlock(startTryCatchLabel, labelList.get(0), label, Type.getInternalName(exception));
+        }
+        // start_try_catch:
+        mv.visitLabel(startTryCatchLabel);
+
+        mv.visitVarInsn(Opcodes.ALOAD, THIS);
         this.convertValue(mv, propertyDescriptor, value);
         Method method = propertyDescriptor.getAccessMethod();
-        MethodInvocationUtil.invokeVirtual(mv, this.internalName, method.getReturnType(), method.getName(),
+        MethodInvocationUtil.invokeVirtual(mv, this.actionClass, method.getReturnType(), method.getName(),
                                            method.getParameterTypes());
 
-        if (propertyDescriptor.isRequired()) {
+        for (int i = 0; i < exceptionList.size(); ++i) {
+            // goto end_try_catch
+            mv.visitJumpInsn(Opcodes.GOTO, endTryCatchLabel);
+
+            // catch(XXXException e)
+            mv.visitLabel(labelList.get(i));
+            mv.visitVarInsn(Opcodes.ASTORE, this.variableIndex);
+
+            if (this.debugMode) {
+                loggerDebug(mv, "Catch exception " + exceptionList.get(i).getName(), this.variableIndex);
+            }
+            if (propertyDescriptor.getComponentType() == null) {
+                this.addFieldError(mv, propertyDescriptor.getName(), propertyDescriptor.getConversionErrorMessageKey(),
+                                   value);
+            } else {
+                mv.visitVarInsn(Opcodes.ALOAD, value);
+                MethodInvocationUtil.invokeStatic(mv, Arrays.class, "toString", Object[].class);
+                mv.visitVarInsn(Opcodes.ASTORE, this.variableIndex);
+                this.addFieldError(mv, propertyDescriptor.getName(), propertyDescriptor.getConversionErrorMessageKey(),
+                                   this.variableIndex);
+            }
+        }
+        // end_try_catch:
+        mv.visitLabel(endTryCatchLabel);
+
+        if (propertyDescriptor.getRequiredAnnotation() != null) {
             // goto end
             mv.visitJumpInsn(Opcodes.GOTO, endLabel);
         }
@@ -333,17 +433,12 @@ public class ActionProxyBuilder {
         // null
         mv.visitLabel(nullLabel);
 
-        if (propertyDescriptor.isRequired()) {
+        if (propertyDescriptor.getRequiredAnnotation() != null) {
             if (this.debugMode) {
                 this.loggerDebug(mv, "Required validation failure");
             }
 
-            // throw new ValidationException("...")
-            mv.visitTypeInsn(Opcodes.NEW, Type.getInternalName(ValidationException.class));
-            mv.visitInsn(Opcodes.DUP);
-            mv.visitLdcInsn("Missing required property " + propertyDescriptor.getName());
-            MethodInvocationUtil.invokeConstructor(mv, ValidationException.class, String.class);
-            mv.visitInsn(Opcodes.ATHROW);
+            this.addFieldError(mv, propertyDescriptor.getName(), propertyDescriptor.getRequiredAnnotation().message());
 
             // end
             mv.visitLabel(endLabel);
@@ -452,36 +547,56 @@ public class ActionProxyBuilder {
     }
 
     private void convertSingleValue(MethodVisitor mv, PropertyDescriptor propertyDescriptor, int value) {
-        Class<?> rawType = propertyDescriptor.getRawType();
+        Class<?> rawType = propertyDescriptor.getComponentType();
+        if (rawType == null) {
+            rawType = propertyDescriptor.getRawType();
+        }
         if (rawType.isPrimitive()) {
-            mv.visitVarInsn(Opcodes.ALOAD, value);
-            // Integer.parseInt(value), Long.parseLong(value), etc
-            MethodInvocationUtil.invokeStatic(mv, ActionProxyBuilder.primitiveToWrapper(rawType), "parse" +
-                ActionUtil.capitalize(rawType.getName()), String.class);
+            if (boolean.class.equals(rawType)) {
+                mv.visitInsn(Opcodes.ICONST_1);
+            } else {
+                mv.visitVarInsn(Opcodes.ALOAD, value);
+                // Integer.parseInt(value), Long.parseLong(value), etc
+                MethodInvocationUtil.invokeStatic(mv, ActionProxyBuilder.primitiveToWrapper(rawType), "parse" +
+                    ActionUtil.capitalize(rawType.getName()), String.class);
+            }
+
         } else if (rawType.equals(String.class)) {
             // do nothing
+            mv.visitVarInsn(Opcodes.ALOAD, value);
         } else if (rawType.equals(Date.class)) {
-            // fmt = new SimpleDateFormat()
-            mv.visitTypeInsn(Opcodes.NEW, Type.getInternalName(SimpleDateFormat.class));
-            mv.visitInsn(Opcodes.DUP);
-            MethodInvocationUtil.invokeConstructor(mv, SimpleDateFormat.class);
-            mv.visitInsn(Opcodes.DUP);
-            mv.visitVarInsn(Opcodes.ASTORE, this.variableIndex);
+            if (this.defaultDateFormat == null) {
+                // fmt = DateFormat.getDateInstance(DateFormat.SHORT);
+                this.loadIntConstant(mv, DateFormat.SHORT);
+                MethodInvocationUtil.invokeStatic(mv, DateFormat.class, "getDateInstance", int.class);
+            } else {
+                // fmt = new SimpleDateFormat(defaultDateFormat);
+                mv.visitTypeInsn(Opcodes.NEW, Type.getInternalName(SimpleDateFormat.class));
+                mv.visitInsn(Opcodes.DUP);
+                mv.visitLdcInsn(this.defaultDateFormat);
+                MethodInvocationUtil.invokeConstructor(mv, SimpleDateFormat.class, String.class);
+            }
 
             // fmt.setLenient(false)
+            mv.visitInsn(Opcodes.DUP);
             mv.visitInsn(Opcodes.ICONST_0);
-            MethodInvocationUtil.invokeVirtual(mv, SimpleDateFormat.class, "setLenient", boolean.class);
+            MethodInvocationUtil.invokeVirtual(mv, DateFormat.class, "setLenient", boolean.class);
 
             // fmt.parse(value)
-            mv.visitVarInsn(Opcodes.ALOAD, this.variableIndex);
             mv.visitVarInsn(Opcodes.ALOAD, value);
-            MethodInvocationUtil.invokeVirtual(mv, SimpleDateFormat.class, "parse", String.class);
+            MethodInvocationUtil.invokeVirtual(mv, DateFormat.class, "parse", String.class);
         } else if (rawType.equals(File.class)) {
+            // TODO
+            mv.visitInsn(Opcodes.ACONST_NULL);
         } else {
             // new Integer(value), new BigInteger(value), etc
             mv.visitTypeInsn(Opcodes.NEW, Type.getInternalName(rawType));
             mv.visitInsn(Opcodes.DUP);
-            mv.visitVarInsn(Opcodes.ALOAD, value);
+            if (Boolean.class.equals(rawType)) {
+                mv.visitLdcInsn("true");
+            } else {
+                mv.visitVarInsn(Opcodes.ALOAD, value);
+            }
             MethodInvocationUtil.invokeConstructor(mv, rawType, String.class);
         }
     }
@@ -504,12 +619,7 @@ public class ActionProxyBuilder {
             // newvalue = new xxx[length]
             mv.visitVarInsn(Opcodes.ILOAD, length);
             if (componentType.isPrimitive()) {
-                mv.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_INT);
-
-                // TODO: ignore boolean array
-                if (componentType.equals(boolean.class)) {
-                    mv.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BOOLEAN);
-                } else if (componentType.equals(byte.class)) {
+                if (componentType.equals(byte.class)) {
                     mv.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BYTE);
                 } else if (componentType.equals(short.class)) {
                     mv.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_SHORT);
@@ -608,68 +718,142 @@ public class ActionProxyBuilder {
         this.variableIndex = newvalue;
     }
 
-    private void buildFillAttributes(MethodVisitor mv) {
-        for (PropertyDescriptor prop : this.actionDescriptor.getPropertyList()) {
-            if (prop.getGetter() != null) {
-                mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.REQ);
-                mv.visitLdcInsn(prop.getName());
-                mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.THIS);
-                this.invokeSelfVirtual(mv, prop.getGetter().getName());
-                if (prop.getElementClass().isPrimitive()) {
-                    java.lang.reflect.Type targetType = ActionProxyBuilder.primitiveToWrapper(prop.getElementClass());
-                    this.invokeStatic(mv, (Class<?>) targetType, "valueOf", prop.getElementClass());
+    private void addCookie(MethodVisitor mv, PropertyDescriptor propertyDescriptor) {
+        Class<?> rawType = propertyDescriptor.getRawType();
+        mv.visitVarInsn(Opcodes.ALOAD, THIS);
+        Method method = propertyDescriptor.getAccessMethod();
+        MethodInvocationUtil.invokeVirtual(mv, this.actionClass, method.getReturnType(), method.getName());
+        Label nullLabel = new Label();
+        if (rawType.isPrimitive()) {
+            MethodInvocationUtil.invokeStatic(mv, primitiveToWrapper(rawType), "toString", rawType);
+            mv.visitVarInsn(Opcodes.ASTORE, this.variableIndex);
+        } else {
+            mv.visitInsn(Opcodes.DUP);
+            mv.visitVarInsn(Opcodes.ASTORE, this.variableIndex);
+            mv.visitJumpInsn(Opcodes.IFNULL, nullLabel);
+
+            if (rawType.equals(Date.class)) {
+                if (this.defaultDateFormat == null) {
+                    // fmt = DateFormat.getDateInstance(DateFormat.SHORT);
+                    this.loadIntConstant(mv, DateFormat.SHORT);
+                    MethodInvocationUtil.invokeStatic(mv, DateFormat.class, "getDateInstance", int.class);
+                } else {
+                    // fmt = new SimpleDateFormat(defaultDateFormat);
+                    mv.visitTypeInsn(Opcodes.NEW, Type.getInternalName(SimpleDateFormat.class));
+                    mv.visitInsn(Opcodes.DUP);
+                    mv.visitLdcInsn(this.defaultDateFormat);
+                    MethodInvocationUtil.invokeConstructor(mv, SimpleDateFormat.class, String.class);
                 }
-                if (prop.isSetToSession()) {
-                    mv.visitVarInsn(Opcodes.ASTORE, cn.edu.zju.acm.mvc.control.actionproxy.VAR3);
-                    mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.VAR3);
-                }
-                ActionProxyBuilder.this.invokeInterface(mv, HttpServletRequest.class, "setAttribute", String.class,
-                                                        Object.class);
-                if (prop.isSetToSession()) {
-                    mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.SESSION);
-                    mv.visitLdcInsn(prop.getName());
-                    mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.VAR3);
-                    ActionProxyBuilder.this.invokeInterface(mv, HttpSession.class, "setAttribute", String.class,
-                                                            Object.class);
-                }
+                mv.visitVarInsn(Opcodes.ALOAD, this.variableIndex);
+                MethodInvocationUtil.invokeVirtual(mv, DateFormat.class, "format", Date.class);
+            } else {
+                mv.visitVarInsn(Opcodes.ALOAD, this.variableIndex);
+                MethodInvocationUtil.invokeVirtual(mv, rawType, "toString");
+            }
+            mv.visitVarInsn(Opcodes.ASTORE, this.variableIndex);
+        }
+
+        // resp.addCookie(cookie)
+        mv.visitVarInsn(Opcodes.ALOAD, RESP);
+
+        // new Cookie("name", "value");
+        mv.visitTypeInsn(Opcodes.NEW, Type.getInternalName(Cookie.class));
+        mv.visitInsn(Opcodes.DUP);
+        mv.visitLdcInsn(propertyDescriptor.getName());
+        mv.visitVarInsn(Opcodes.ALOAD, this.variableIndex);
+        MethodInvocationUtil.invokeConstructor(mv, Cookie.class);
+
+        cn.edu.zju.acm.mvc.control.annotation.Cookie cookie = propertyDescriptor.getCookieAnnotation();
+        if (cookie.domain().length() > 0) {
+            mv.visitInsn(Opcodes.DUP);
+            mv.visitLdcInsn(cookie.domain());
+            MethodInvocationUtil.invokeVirtual(mv, Cookie.class, "setDomain", String.class);
+        }
+        if (cookie.maxAge() >= 0) {
+            mv.visitInsn(Opcodes.DUP);
+            mv.visitLdcInsn(cookie.maxAge());
+            MethodInvocationUtil.invokeVirtual(mv, Cookie.class, "setMaxAge", int.class);
+        }
+        if (cookie.path().length() > 0) {
+            mv.visitInsn(Opcodes.DUP);
+            mv.visitLdcInsn(cookie.path());
+            MethodInvocationUtil.invokeVirtual(mv, Cookie.class, "setPath", String.class);
+        }
+        if (cookie.secure()) {
+            mv.visitInsn(Opcodes.DUP);
+            mv.visitInsn(Opcodes.ICONST_1);
+            MethodInvocationUtil.invokeVirtual(mv, Cookie.class, "setSecure", boolean.class);
+        }
+        if (cookie.version() >= 0) {
+            mv.visitInsn(Opcodes.DUP);
+            mv.visitLdcInsn(cookie.version());
+            MethodInvocationUtil.invokeVirtual(mv, Cookie.class, "setVersion", int.class);
+        }
+
+        MethodInvocationUtil.invokeInterface(mv, HttpServletResponse.class, "addCookie", Cookie.class);
+
+        if (!rawType.isPrimitive()) {
+            // null
+            mv.visitLabel(nullLabel);
+        }
+    }
+
+    private void setAttribute(MethodVisitor mv, PropertyDescriptor propertyDescriptor, int container) {
+        Class<?> rawType = propertyDescriptor.getRawType();
+        // container.setAttribute("name", value);
+        mv.visitVarInsn(Opcodes.ALOAD, container);
+
+        if (rawType.isPrimitive()) {
+            // new Integer(value), new Long(value), etc
+            Class<?> wrapperClass = primitiveToWrapper(rawType);
+            mv.visitTypeInsn(Opcodes.NEW, Type.getInternalName(wrapperClass));
+            mv.visitInsn(Opcodes.DUP);
+        }
+
+        // this.getXXX();
+        mv.visitVarInsn(Opcodes.ALOAD, THIS);
+        Method method = propertyDescriptor.getAccessMethod();
+        MethodInvocationUtil.invokeVirtual(mv, this.actionClass, method.getReturnType(), method.getName());
+
+        if (rawType.isPrimitive()) {
+            MethodInvocationUtil.invokeConstructor(mv, Cookie.class);
+        }
+
+        mv.visitLdcInsn(propertyDescriptor.getName());
+        MethodInvocationUtil.invokeInterface(mv, HttpSession.class, "setAttribute", String.class, Object.class);
+    }
+
+    private void setSessionAttributes(MethodVisitor mv) {
+        for (PropertyDescriptor propertyDescriptor : this.actionDescriptor.getOutputPropertyMap().values()) {
+            if (propertyDescriptor.isSessionVariable()) {
+                this.setAttribute(mv, propertyDescriptor, this.session);
             }
         }
     }
 
-    private void buildAddCookies(MethodVisitor mv, Label endLabel) {
-        mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.THIS);
-        mv.visitFieldInsn(Opcodes.GETFIELD, this.internalName, "outputCookies", Type.getDescriptor(List.class));
-        mv.visitJumpInsn(Opcodes.IFNULL, endLabel);
-
-        // i = this.outputCookies.iterator()
-        mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.THIS);
-        mv.visitFieldInsn(Opcodes.GETFIELD, this.internalName, "outputCookies", Type.getDescriptor(List.class));
-        this.invokeInterface(mv, List.class, "iterator");
-        mv.visitVarInsn(Opcodes.ASTORE, cn.edu.zju.acm.mvc.control.actionproxy.I);
-
-        // goto for_test
-        Label forTestLabel = new Label();
-        mv.visitJumpInsn(Opcodes.GOTO, forTestLabel);
-
-        // for_body:
-        Label forBodyLabel = new Label();
-        mv.visitLabel(forBodyLabel);
-
-        // resp.addCookie((Cookie)i.next())
-        mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.RESP);
-        mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.I);
-        this.invokeInterface(mv, Iterator.class, "next");
-        mv.visitTypeInsn(Opcodes.CHECKCAST, Type.getInternalName(Cookie.class));
-        this.invokeInterface(mv, HttpServletResponse.class, "addCookie", Cookie.class);
-        mv.visitLabel(forTestLabel);
-        mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.I);
-        this.invokeInterface(mv, Iterator.class, "hasNext");
-        mv.visitJumpInsn(Opcodes.IFNE, forBodyLabel);
+    private void addCookies(MethodVisitor mv) {
+        for (PropertyDescriptor propertyDescriptor : this.actionDescriptor.getOutputPropertyMap().values()) {
+            if (propertyDescriptor.getCookieAnnotation() != null) {
+                this.addCookie(mv, propertyDescriptor);
+            }
+        }
     }
 
-    private void convertResult(MethodVisitor mv) {
-        Map<String, Result> resultMap = this.actionDescriptor.getResultMap();
+    private void setRequestAttributes(MethodVisitor mv) {
+        for (PropertyDescriptor propertyDescriptor : this.actionDescriptor.getOutputPropertyMap().values()) {
+            this.setAttribute(mv, propertyDescriptor, REQ);
+        }
+    }
 
+    private void dispatchResult(MethodVisitor mv) {
+        Map<String, Result> resultMap = this.actionDescriptor.getResultMap();
+        Set<ResultType> resultTypeSet = new HashSet<ResultType>();
+        for (Result result : resultMap.values()) {
+            resultTypeSet.add(result.type());
+        }
+        int resultType = resultTypeSet.size() == 1 ? -1 : this.variableIndex++;
+
+        Label resultNotNullLabel = new Label();
         for (Map.Entry<String, Result> entry : resultMap.entrySet()) {
             // if (!"...".equals(var2)) goto not_equal
             mv.visitLdcInsn(entry.getKey());
@@ -678,39 +862,150 @@ public class ActionProxyBuilder {
             Label notEqualsLabel = new Label();
             mv.visitJumpInsn(Opcodes.IFEQ, notEqualsLabel);
 
-            // result = "...";
-            mv.visitLdcInsn(pair.getSecond());
-            mv.visitVarInsn(Opcodes.ASTORE, cn.edu.zju.acm.mvc.control.actionproxy.VAR1);
+            Result result = entry.getValue();
+            if (resultTypeSet.size() > 1) {
+                // resultType = ...;
+                mv.visitLdcInsn(result.type().ordinal());
+                mv.visitVarInsn(Opcodes.ISTORE, resultType);
+            }
 
-            // goto end_try_catch
-            mv.visitJumpInsn(Opcodes.GOTO, endTryCatchLabel);
+            if (result.type().equals(ResultType.Raw)) {
+                // result = this.getXXX();
+                mv.visitVarInsn(Opcodes.ALOAD, THIS);
+                Method method = this.actionDescriptor.getOutputPropertyMap().get(result.value()).getAccessMethod();
+                MethodInvocationUtil.invokeVirtual(mv, this.actionClass, method.getReturnType(), method.getName());
+            } else {
+                // result = "value";
+                mv.visitLdcInsn(result.value());
+            }
+            mv.visitVarInsn(Opcodes.ASTORE, RESULT);
+
+            for (Header header : result.headers()) {
+                // resp.addHeader("name", "value");
+                mv.visitVarInsn(Opcodes.ALOAD, RESP);
+                mv.visitLdcInsn(header.name());
+                mv.visitLdcInsn(header.value());
+                MethodInvocationUtil.invokeInterface(mv, HttpServletResponse.class, "addHeader", String.class,
+                                                     String.class);
+            }
+
+            // goto result_not_null
+            mv.visitJumpInsn(Opcodes.GOTO, resultNotNullLabel);
 
             // not_equal
             mv.visitLabel(notEqualsLabel);
         }
 
-        // if (result != null) goto result_not_null
-        mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.VAR1);
-        Label resultNotNullLabel = new Label();
-        mv.visitJumpInsn(Opcodes.IFNONNULL, resultNotNullLabel);
-
         // throw new InvalidResultException(var2)
         mv.visitTypeInsn(Opcodes.NEW, Type.getInternalName(InvalidResultException.class));
         mv.visitInsn(Opcodes.DUP);
-        mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.VAR2);
-        this.invokeConstructor(mv, InvalidResultException.class, String.class);
+        mv.visitVarInsn(Opcodes.ALOAD, RESULT);
+        MethodInvocationUtil.invokeConstructor(mv, InvalidResultException.class, String.class);
         mv.visitInsn(Opcodes.ATHROW);
 
         // result_not_null:
         mv.visitLabel(resultNotNullLabel);
 
-        this.buildFillAttributes(mv);
+        this.setSessionAttributes(mv);
+        this.addCookies(mv);
 
-        this.buildAddCookies(mv, endTryCatchLabel);
+        List<Label> labelList = new ArrayList<Label>();
+        for (ResultType rt : new ResultType[] {ResultType.Jsp, ResultType.ZView, ResultType.Redirect, ResultType.Raw}) {
+            if (resultTypeSet.contains(rt)) {
+                if (labelList.size() > 0) {
+                    mv.visitLabel(labelList.get(labelList.size() - 1));
+                }
+                if (resultTypeSet.size() > 1) {
+                    mv.visitVarInsn(Opcodes.ILOAD, resultType);
+                    mv.visitLdcInsn(rt.ordinal());
+                    Label label = new Label();
+                    mv.visitJumpInsn(Opcodes.IFNE, label);
+                }
+                if (rt.equals(ResultType.Jsp)) {
+                    this.dispatchJspResult(mv);
+                } else if (rt.equals(ResultType.ZView)) {
+                    this.dispatchZViewResult(mv);
+                } else if (rt.equals(ResultType.Redirect)) {
+                    this.dispatchRedirectResult(mv);
+                } else {
+                    this.dispatchRawResult(mv);
+                }
+                resultTypeSet.remove(rt);
+            }
+        }
+    }
 
-        // return result
-        mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.VAR1);
-        mv.visitInsn(Opcodes.ARETURN);
+    private void dispatchJspResult(MethodVisitor mv) {
+        this.setRequestAttributes(mv);
+
+        // req.getRequestDispatcher(result).forward(req, resp);
+        mv.visitVarInsn(Opcodes.ALOAD, REQ);
+        mv.visitVarInsn(Opcodes.ALOAD, RESULT);
+        MethodInvocationUtil.invokeInterface(mv, HttpServletRequest.class, "getRequestDispatcher", String.class);
+        mv.visitVarInsn(Opcodes.ALOAD, REQ);
+        mv.visitVarInsn(Opcodes.ALOAD, RESP);
+        MethodInvocationUtil.invokeInterface(mv, RequestDispatcher.class, "forward", HttpServletRequest.class,
+                                             HttpServletResponse.class);
+    }
+
+    private void dispatchZViewResult(MethodVisitor mv) {
+        // TODO
+    }
+
+    private void dispatchRedirectResult(MethodVisitor mv) {
+        // resp.sendRedirect(result);
+        mv.visitVarInsn(Opcodes.ALOAD, RESP);
+        mv.visitVarInsn(Opcodes.ALOAD, RESULT);
+        MethodInvocationUtil.invokeInterface(mv, HttpServletResponse.class, "sendRedirect", String.class);
+    }
+
+    private void dispatchRawResult(MethodVisitor mv) {
+        int b = this.variableIndex;
+        int out = this.variableIndex + 1;
+        int length = this.variableIndex + 2;
+        Label startLabel = new Label();
+        Label endLabel = new Label();
+
+        // byte[] b = new byte[4096];
+        mv.visitLdcInsn(4096);
+        mv.visitIntInsn(Opcodes.NEWARRAY, Opcodes.T_BYTE);
+        mv.visitVarInsn(Opcodes.ASTORE, b);
+
+        // out = resp.getOutputStream();
+        mv.visitVarInsn(Opcodes.ALOAD, RESP);
+        MethodInvocationUtil.invokeInterface(mv, HttpServletResponse.class, "getOutputStream");
+        mv.visitVarInsn(Opcodes.ASTORE, out);
+
+        // start
+        mv.visitLabel(startLabel);
+
+        // length = result.read(b);
+        mv.visitVarInsn(Opcodes.ALOAD, RESULT);
+        mv.visitVarInsn(Opcodes.ALOAD, b);
+        MethodInvocationUtil.invokeVirtual(mv, InputStream.class, "read", byte[].class);
+        mv.visitInsn(Opcodes.DUP);
+        mv.visitVarInsn(Opcodes.ISTORE, length);
+
+        // if (length < 0) goto end
+        mv.visitInsn(Opcodes.ICONST_0);
+        mv.visitJumpInsn(Opcodes.IFLT, endLabel);
+
+        // out.write(b, 0, length);
+        mv.visitVarInsn(Opcodes.ALOAD, out);
+        mv.visitVarInsn(Opcodes.ALOAD, b);
+        mv.visitInsn(Opcodes.ICONST_0);
+        mv.visitVarInsn(Opcodes.ILOAD, length);
+        MethodInvocationUtil.invokeVirtual(mv, ServletOutputStream.class, "write", byte[].class, int.class, int.class);
+
+        // goto start;
+        mv.visitJumpInsn(Opcodes.GOTO, startLabel);
+
+        // end
+        mv.visitLabel(endLabel);
+
+        // out.close();
+        mv.visitVarInsn(Opcodes.ALOAD, out);
+        MethodInvocationUtil.invokeVirtual(mv, ServletOutputStream.class, "close");
     }
 
     public void getField(MethodVisitor mv, Class<?> fieldClass, String fieldName) {
@@ -723,14 +1018,14 @@ public class ActionProxyBuilder {
         // this.logger.debug(message);
         this.getField(mv, Logger.class, "logger");
         mv.visitLdcInsn(message);
-        MethodInvocationUtil.invokeVirtual(mv, Logger.class, "debug", String.class);
+        MethodInvocationUtil.invokeVirtual(mv, Logger.class, "debug", Object.class);
     }
 
     private void loggerDebug(MethodVisitor mv, int message) {
         // this.logger.debug(message);
         this.getField(mv, Logger.class, "logger");
         mv.visitVarInsn(Opcodes.ALOAD, message);
-        MethodInvocationUtil.invokeVirtual(mv, Logger.class, "debug", String.class);
+        MethodInvocationUtil.invokeVirtual(mv, Logger.class, "debug", Object.class);
     }
 
     private void loggerDebug(MethodVisitor mv, String message, int e) {
@@ -738,51 +1033,51 @@ public class ActionProxyBuilder {
         this.getField(mv, Logger.class, "logger");
         mv.visitLdcInsn(message);
         mv.visitVarInsn(Opcodes.ALOAD, e);
-        MethodInvocationUtil.invokeVirtual(mv, Logger.class, "debug", String.class, Object.class);
+        MethodInvocationUtil.invokeVirtual(mv, Logger.class, "debug", Object.class, Throwable.class);
     }
 
-    private void initializeSession(MethodVisitor mv) {
-        boolean requireSession = false;
-        for (PropertyDescriptor propertyDescriptor : this.actionDescriptor.getInputPropertyMap().values()) {
-            if (propertyDescriptor.isSessionVariable()) {
-                requireSession = true;
+    private void addFieldError(MethodVisitor mv, String name, String messageKey, int... arguments) {
+        // this.addFieldError("name", "messageKey");
+        mv.visitVarInsn(Opcodes.ALOAD, THIS);
+        mv.visitLdcInsn(name);
+        mv.visitLdcInsn(messageKey);
+        this.loadIntConstant(mv, arguments.length);
+        mv.visitTypeInsn(Opcodes.ANEWARRAY, "java/lang/String");
+        for (int i = 0; i < arguments.length; ++i) {
+            mv.visitInsn(Opcodes.DUP);
+            this.loadIntConstant(mv, i);
+            mv.visitVarInsn(Opcodes.ALOAD, arguments[i]);
+            mv.visitInsn(Opcodes.AASTORE);
+        }
+        MethodInvocationUtil.invokeVirtual(mv, Action.class, void.class, "addFieldError", String.class, String.class,
+                                           String[].class);
+    }
+
+    private void loadIntConstant(MethodVisitor mv, int value) {
+        switch (value) {
+            case -1:
+                mv.visitInsn(Opcodes.ICONST_M1);
                 break;
-            }
-        }
-        if (!requireSession) {
-            for (PropertyDescriptor propertyDescriptor : this.actionDescriptor.getOutputPropertyMap().values()) {
-                if (propertyDescriptor.isSessionVariable()) {
-                    requireSession = true;
-                    break;
-                }
-            }
-        }
-        if (requireSession) {
-            // HttpSession session = req.getSession();
-            this.session = this.variable++;
-            mv.visitVarInsn(Opcodes.ALOAD, cn.edu.zju.acm.mvc.control.actionproxy.REQ);
-            MethodInvocationUtil.invokeInterface(mv, HttpServletRequest.class, "getSession");
-            mv.visitVarInsn(Opcodes.ASTORE, this.session);
-        }
-    }
-
-    private class ExecuteMethodGenerator {
-
-        private MethodVisitor mv;
-
-        public ExecuteMethodGenerator(ClassWriter cw) {
-            mv =
-                    cw.visitMethod(Opcodes.ACC_PUBLIC, "execute",
-                                   MethodInvocationUtil.getMethodDescriptor(String.class, HttpServletRequest.class,
-                                                                            HttpServletResponse.class), null,
-                                   new String[] {Type.getInternalName(Exception.class)});
-
-        }
-
-        public void execute() {
-            mv.visitCode();
-
-            mv.visitEnd();
+            case 0:
+                mv.visitInsn(Opcodes.ICONST_0);
+                break;
+            case 1:
+                mv.visitInsn(Opcodes.ICONST_1);
+                break;
+            case 2:
+                mv.visitInsn(Opcodes.ICONST_2);
+                break;
+            case 3:
+                mv.visitInsn(Opcodes.ICONST_3);
+                break;
+            case 4:
+                mv.visitInsn(Opcodes.ICONST_4);
+                break;
+            case 5:
+                mv.visitInsn(Opcodes.ICONST_5);
+                break;
+            default:
+                mv.visitLdcInsn(value);
         }
     }
 

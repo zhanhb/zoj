@@ -18,6 +18,8 @@ public class TestUnsupportedInputPropertyAction extends TestActionBase {
 
     private Map<Integer, String> mapProp;
 
+    private boolean[] booleanArrayProp;
+
     public Object getObjProp() {
         return this.objProp;
     }
@@ -56,6 +58,14 @@ public class TestUnsupportedInputPropertyAction extends TestActionBase {
 
     public void setMapProp(Map<Integer, String> mapProp) {
         this.mapProp = mapProp;
+    }
+
+    public boolean[] getBooleanArrayProp() {
+        return this.booleanArrayProp;
+    }
+
+    public void setBooleanArrayProp(boolean[] booleanArrayProp) {
+        this.booleanArrayProp = booleanArrayProp;
     }
 
 }

@@ -37,7 +37,7 @@ public class MethodInvocationUtil {
     }
 
     public static void invokeConstructor(MethodVisitor mv, Class<?> clazz, Class<?>... parameterTypes) {
-        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, Type.getInternalName(clazz), "<Init>",
+        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, Type.getInternalName(clazz), "<init>",
                            MethodInvocationUtil.getConstructorDescriptor(clazz, parameterTypes));
     }
 
@@ -46,21 +46,16 @@ public class MethodInvocationUtil {
 
     }
 
-    public static void invokeInterface(MethodVisitor mv, String internalName, Class<?> returnType, String methodName,
-                                       Class<?>... parameterTypes) {
-        MethodInvocationUtil.invokeMethod(mv, Opcodes.INVOKEINTERFACE, internalName, returnType, methodName, parameterTypes);
-    }
-
     private static void invokeMethod(MethodVisitor mv, int opcode, Class<?> clazz, String methodName,
                                      Class<?>... parameterTypes) {
         mv.visitMethodInsn(opcode, Type.getInternalName(clazz), methodName,
                            MethodInvocationUtil.getMethodDescriptor(clazz, methodName, parameterTypes));
     }
 
-    private static void invokeMethod(MethodVisitor mv, int opcode, String internalName, Class<?> returnType,
+    private static void invokeMethod(MethodVisitor mv, int opcode, Class<?> clazz, Class<?> returnType,
                                      String methodName, Class<?>... parameterTypes) {
 
-        mv.visitMethodInsn(opcode, internalName, methodName,
+        mv.visitMethodInsn(opcode, Type.getInternalName(clazz), methodName,
                            MethodInvocationUtil.getMethodDescriptor(returnType, parameterTypes));
     }
 
@@ -68,17 +63,12 @@ public class MethodInvocationUtil {
         MethodInvocationUtil.invokeMethod(mv, Opcodes.INVOKESTATIC, clazz, methodName, parameterTypes);
     }
 
-    public static void invokeStatic(MethodVisitor mv, String internalName, Class<?> returnType, String methodName,
-                                    Class<?>... parameterTypes) {
-        MethodInvocationUtil.invokeMethod(mv, Opcodes.INVOKESTATIC, internalName, returnType, methodName, parameterTypes);
-    }
-
     public static void invokeVirtual(MethodVisitor mv, Class<?> clazz, String methodName, Class<?>... parameterTypes) {
         MethodInvocationUtil.invokeMethod(mv, Opcodes.INVOKEVIRTUAL, clazz, methodName, parameterTypes);
     }
 
-    public static void invokeVirtual(MethodVisitor mv, String internalName, Class<?> returnType, String methodName,
+    public static void invokeVirtual(MethodVisitor mv, Class<?> clazz, Class<?> returnType, String methodName,
                                      Class<?>... parameterTypes) {
-        MethodInvocationUtil.invokeMethod(mv, Opcodes.INVOKEVIRTUAL, internalName, returnType, methodName, parameterTypes);
+        MethodInvocationUtil.invokeMethod(mv, Opcodes.INVOKEVIRTUAL, clazz, returnType, methodName, parameterTypes);
     }
 }

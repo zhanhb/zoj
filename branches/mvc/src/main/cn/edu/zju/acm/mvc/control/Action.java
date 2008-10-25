@@ -4,6 +4,9 @@ package cn.edu.zju.acm.mvc.control;
 import java.util.ArrayList;
 import java.util.List;
 
+import cn.edu.zju.acm.mvc.control.annotation.ConversionError;
+
+@ConversionError(message="error.conversion")
 public abstract class Action {
 
     public static final String SUCCESS = "success";
@@ -14,15 +17,15 @@ public abstract class Action {
 
     public static final String EXCEPTION = "exception";
 
-    private List<String> errorMessages = new ArrayList<String>();
+    private List<FieldError> fieldErrors = new ArrayList<FieldError>();
 
-    public List<String> getErrorMessages() {
-        return this.errorMessages;
+    public List<FieldError> getFieldErrors() {
+        return this.fieldErrors;
     }
 
-    protected void addErrorMessage(String errorMessage) {
-        this.errorMessages.add(errorMessage);
+    protected void addFieldError(String name, String messageKey, String[] arguments) {
+        this.fieldErrors.add(new FieldError(name, messageKey, arguments));
     }
-    
+
     public abstract String execute() throws Exception;
 }

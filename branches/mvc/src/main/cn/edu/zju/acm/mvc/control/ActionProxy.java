@@ -6,5 +6,5 @@ import javax.servlet.http.HttpServletResponse;
 
 public interface ActionProxy {
     
-    String execute(HttpServletRequest req, HttpServletResponse resp) throws Exception;
+    void execute(HttpServletRequest req, HttpServletResponse resp) throws Exception;
 }

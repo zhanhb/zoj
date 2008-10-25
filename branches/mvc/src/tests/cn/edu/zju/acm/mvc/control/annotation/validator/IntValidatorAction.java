@@ -2,7 +2,7 @@
 package cn.edu.zju.acm.mvc.control.annotation.validator;
 
 import cn.edu.zju.acm.mvc.control.TestActionBase;
-import cn.edu.zju.acm.mvc.control.annotation.validator.IntValidator;
+import cn.edu.zju.acm.mvc.control.annotation.validator.IntRangeValidator;
 
 public class IntValidatorAction extends TestActionBase {
 
@@ -18,32 +18,32 @@ public class IntValidatorAction extends TestActionBase {
 
     int maxProp;
 
-    @IntValidator
+    @IntRangeValidator
     public void setIntProp(int intProp) {
         this.intProp = intProp;
     }
 
-    @IntValidator
+    @IntRangeValidator
     public void setLongProp(long longProp) {
         this.longProp = longProp;
     }
 
-    @IntValidator
+    @IntRangeValidator
     public void setIntArrayProp(int[] intArrayProp) {
         this.intArrayProp = intArrayProp;
     }
 
-    @IntValidator
+    @IntRangeValidator
     public void setLongArrayProp(long[] longArrayProp) {
         this.longArrayProp = longArrayProp;
     }
 
-    @IntValidator(min = 1)
+    @IntRangeValidator(min = 1)
     public void setMinProp(int minnProp) {
         this.minProp = minnProp;
     }
 
-    @IntValidator(max = 2)
+    @IntRangeValidator(max = 2)
     public void setMaxProp(int maxProp) {
         this.maxProp = maxProp;
     }

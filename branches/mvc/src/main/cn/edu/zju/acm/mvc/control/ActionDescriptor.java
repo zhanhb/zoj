@@ -10,6 +10,7 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 
+import cn.edu.zju.acm.mvc.control.annotation.ConversionError;
 import cn.edu.zju.acm.mvc.control.annotation.Exceptions;
 import cn.edu.zju.acm.mvc.control.annotation.OneException;
 import cn.edu.zju.acm.mvc.control.annotation.Result;
@@ -18,7 +19,7 @@ import cn.edu.zju.acm.mvc.control.annotation.Results;
 
 public class ActionDescriptor {
 
-    private Logger logger = Logger.getLogger(PropertyDescriptor.class);
+    private static Logger logger = Logger.getLogger(PropertyDescriptor.class);
 
     private Class<? extends Action> actionClass;
 
@@ -35,42 +36,47 @@ public class ActionDescriptor {
 
     private Map<String, PropertyDescriptor> outputPropertyMap = new HashMap<String, PropertyDescriptor>();
 
-    private ActionDescriptor(Class<? extends Action> actionClass) {
-        int modifiers = actionClass.getModifiers();
-        if (Modifier.isAbstract(modifiers)) {
-            this.logger.debug("Skip abstract class " + actionClass.getName());
-            return;
-        }
-        if (Modifier.isFinal(modifiers)) {
-            this.logger.warn("Skip final class " + actionClass.getName());
-            return;
-        }
-        if (!Modifier.isPublic(modifiers)) {
-            this.logger.warn("Skip non-public class " + actionClass.getName());
-            return;
-        }
-        try {
-            actionClass.getConstructor();
-        } catch (Exception e) {
-            this.logger.error("No public default constructor defined for action class " + actionClass.getName(), e);
-            return;
-        }
+    private String conversionErrorMessageKey = null;
+
+    protected ActionDescriptor(Class<? extends Action> actionClass) {
         this.actionClass = actionClass;
-        for (PropertyDescriptor propertyDescriptor : PropertyDescriptor.getInputProperties(actionClass)) {
-            this.inputPropertyMap.put(propertyDescriptor.getName(), propertyDescriptor);
-        }
-        for (PropertyDescriptor propertyDescriptor : PropertyDescriptor.getOutputProperties(actionClass)) {
-            this.outputPropertyMap.put(propertyDescriptor.getName(), propertyDescriptor);
-        }
-        this.initResultMap();
-        this.initExecpetionMap();
-        if (this.resultMap.size() == 0) {
-            this.logger.error("No results defined for action class " + actionClass.getName());
-        }
     }
 
     public static ActionDescriptor getActionDescriptor(Class<? extends Action> actionClass) {
         ActionDescriptor ret = new ActionDescriptor(actionClass);
+        int modifiers = actionClass.getModifiers();
+        if (Modifier.isAbstract(modifiers)) {
+            ActionDescriptor.logger.debug("Skip abstract class " + actionClass.getName());
+            return null;
+        }
+        if (Modifier.isFinal(modifiers)) {
+            ActionDescriptor.logger.warn("Skip final class " + actionClass.getName());
+            return null;
+        }
+        if (!Modifier.isPublic(modifiers)) {
+            ActionDescriptor.logger.warn("Skip non-public class " + actionClass.getName());
+            return null;
+        }
+        try {
+            actionClass.getConstructor();
+        } catch (Exception e) {
+            ActionDescriptor.logger.error("No public default constructor defined for action class " +
+                actionClass.getName(), e);
+            return null;
+        }
+
+        for (PropertyDescriptor propertyDescriptor : PropertyDescriptor.getInputProperties(ret)) {
+            ret.inputPropertyMap.put(propertyDescriptor.getName(), propertyDescriptor);
+        }
+        for (PropertyDescriptor propertyDescriptor : PropertyDescriptor.getOutputProperties(ret)) {
+            ret.outputPropertyMap.put(propertyDescriptor.getName(), propertyDescriptor);
+        }
+        ret.initResultMap();
+        ret.initExecpetionMap();
+        ret.initConversionErrorMessageKey();
+        if (ret.resultMap.size() == 0) {
+            ActionDescriptor.logger.error("No results defined for action class " + actionClass.getName());
+        }
         if (ret.resultMap.size() == 0) {
             return null;
         }
@@ -97,6 +103,10 @@ public class ActionDescriptor {
         return this.outputPropertyMap;
     }
 
+    public String getConversionErrorMessageKey() {
+        return this.conversionErrorMessageKey;
+    }
+
     private void initResultMap() {
         for (Class<?> clazz = this.actionClass; !Action.class.equals(clazz); clazz = clazz.getSuperclass()) {
             for (Annotation annotation : clazz.getAnnotations()) {
@@ -110,21 +120,24 @@ public class ActionDescriptor {
             }
         }
     }
-    
+
     private void addResult(Class<?> clazz, Result result) {
         if (result.type() == ResultType.Raw) {
             PropertyDescriptor propertyDescriptor = this.outputPropertyMap.get(result.value());
             if (propertyDescriptor == null) {
-                this.logger.error(String.format("Invalid result %s@%s. No output property \"%s\" found.",
-                                                result.toString(), clazz.getName(), result.value()));
+                ActionDescriptor.logger.error(String.format("Invalid result %s@%s. No output property \"%s\" found.",
+                                                            result.toString(), clazz.getName(), result.value()));
                 return;
             } else if (!InputStream.class.isAssignableFrom(propertyDescriptor.getRawType())) {
-                this.logger.error(String.format("Invalid result %s@%s. Property \"%s\" should be InputStream.",
-                                                result.toString(), clazz.getName(), result.value()));
+                ActionDescriptor.logger
+                                       .error(String
+                                                    .format(
+                                                            "Invalid result %s@%s. Property \"%s\" should be InputStream.",
+                                                            result.toString(), clazz.getName(), result.value()));
                 return;
             }
         }
-        
+
         String resultName = result.name();
         Result oldResult = this.resultMap.get(resultName);
         if (oldResult == null) {
@@ -133,11 +146,11 @@ public class ActionDescriptor {
         } else {
             Class<?> oldClazz = this.resultClassMap.get(oldResult);
             if (clazz.equals(oldClazz)) {
-                this.logger.error(String.format("Duplicate result name \"%s\" in %s", resultName,
-                                                clazz.getName()));
+                ActionDescriptor.logger.error(String.format("Duplicate result name \"%s\" in %s", resultName,
+                                                            clazz.getName()));
             } else {
-                this.logger.debug(String.format("%s@%s is overridden by %s@%s", result.toString(),
-                                                clazz.getName(), oldResult.toString(), oldClazz.getName()));
+                ActionDescriptor.logger.debug(String.format("%s@%s is overridden by %s@%s", result.toString(),
+                                                            clazz.getName(), oldResult.toString(), oldClazz.getName()));
             }
         }
     }
@@ -155,25 +168,26 @@ public class ActionDescriptor {
             }
         }
     }
-    
+
     private void addException(Class<?> clazz, OneException exception) {
         if (!this.resultMap.containsKey(exception.result())) {
-            this.logger.error(String.format("Invalid result in %s@%s", exception.toString(), clazz.getName()));
+            ActionDescriptor.logger.error(String.format("Invalid result in %s@%s", exception.toString(),
+                                                        clazz.getName()));
             return;
         }
-        
+
         Class<? extends Throwable> exceptionClass = exception.exception();
         boolean overridden = false;
         for (OneException oldException : this.exceptionMap.values()) {
             if (oldException.exception().isAssignableFrom(exceptionClass)) {
                 Class<?> oldClazz = this.exceptionClassMap.get(oldException);
                 if (clazz.equals(oldClazz)) {
-                    this.logger.error(String.format("%s: %s is overridden by %s", clazz.getName(),
-                                                    exception.toString(), oldException.toString()));
+                    ActionDescriptor.logger.error(String.format("%s: %s is overridden by %s", clazz.getName(),
+                                                                exception.toString(), oldException.toString()));
                 } else {
-                    this.logger.debug(String.format("%s@%s is overridden by %s@%s", exception.toString(),
-                                                    clazz.getName(), oldException.toString(),
-                                                    oldClazz.getName()));
+                    ActionDescriptor.logger.debug(String.format("%s@%s is overridden by %s@%s", exception.toString(),
+                                                                clazz.getName(), oldException.toString(),
+                                                                oldClazz.getName()));
                 }
                 overridden = true;
                 break;
@@ -182,6 +196,17 @@ public class ActionDescriptor {
         if (!overridden) {
             this.exceptionMap.put(exceptionClass, exception);
             this.exceptionClassMap.put(exception, clazz);
+        }
+    }
+
+    private void initConversionErrorMessageKey() {
+        for (Class<?> clazz = this.actionClass; !Object.class.equals(clazz); clazz = clazz.getSuperclass()) {
+            for (Annotation annotation : clazz.getAnnotations()) {
+                if (annotation instanceof ConversionError) {
+                    this.conversionErrorMessageKey = ((ConversionError) annotation).message();
+                    return;
+                }
+            }
         }
     }
 }

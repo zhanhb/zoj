@@ -18,5 +18,5 @@ public @interface Cookie {
 
     boolean secure() default false;
 
-    int version() default 0;
+    int version() default -1;
 }

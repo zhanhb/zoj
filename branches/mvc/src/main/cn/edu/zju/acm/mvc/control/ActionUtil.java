@@ -27,7 +27,7 @@ public class ActionUtil {
                     } catch (NoSuchMethodException e) {
                         ActionUtil.logger.error("Class " + className + " should have a public default constructor", e);
                     }
-                    actionDescriptorMap.put("/" + className.replace(".", "/") + ".za", new ActionDescriptor(clazz));
+                    actionDescriptorMap.put("/" + className.replace(".", "/") + ".za", ActionDescriptor.getActionDescriptor(clazz));
                 } catch (ClassNotFoundException e) {
                     ActionUtil.logger.error(e);
                 } catch (ClassCastException e) {
