@@ -12,7 +12,7 @@ import cn.edu.zju.acm.mvc.control.annotation.Session;
 import cn.edu.zju.acm.mvc.control.annotation.validator.IntRangeValidator;
 import cn.edu.zju.acm.mvc.control.annotation.validator.Required;
 
-public class TestInvalidSessionPropertyAction extends TestActionBase {
+public class TestSessionInvalidAnnotationsPropertyAction extends TestActionBase {
 
     private Object objProp;
 

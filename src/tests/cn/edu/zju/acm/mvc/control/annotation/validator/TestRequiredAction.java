@@ -7,7 +7,7 @@ import java.util.Date;
 import cn.edu.zju.acm.mvc.control.TestActionBase;
 import cn.edu.zju.acm.mvc.control.annotation.validator.Required;
 
-public class RequiredAction extends TestActionBase {
+public class TestRequiredAction extends TestActionBase {
 
     int intProp;
 

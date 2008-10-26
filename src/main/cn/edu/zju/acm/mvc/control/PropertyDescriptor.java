@@ -21,7 +21,7 @@ import org.apache.log4j.Logger;
 import cn.edu.zju.acm.mvc.control.annotation.ConversionError;
 import cn.edu.zju.acm.mvc.control.annotation.Cookie;
 import cn.edu.zju.acm.mvc.control.annotation.Session;
-import cn.edu.zju.acm.mvc.control.annotation.validator.FloatRangeValidator;
+import cn.edu.zju.acm.mvc.control.annotation.validator.DoubleRangeValidator;
 import cn.edu.zju.acm.mvc.control.annotation.validator.IntRangeValidator;
 import cn.edu.zju.acm.mvc.control.annotation.validator.Required;
 import cn.edu.zju.acm.mvc.control.annotation.validator.StringLengthValidator;
@@ -88,7 +88,7 @@ public class PropertyDescriptor {
                     propertyDescriptor.accessMethod = method;
                     propertyDescriptor.type = propertyType;
                     propertyDescriptor.fillPropertyAttributes(input);
-                    if (propertyDescriptor.sessionVariable || !input || canReadFromParameterValues(propertyType)) {
+                    if (propertyDescriptor.sessionVariable || !input || canReadFromString(propertyType)) {
                         propertyDescriptorList.add(propertyDescriptor);
                     }
                 }
@@ -130,7 +130,7 @@ public class PropertyDescriptor {
         return false;
     }
 
-    private static boolean canReadFromParameterValues(Type type) {
+    private static boolean canReadFromString(Type type) {
         if (type instanceof Class) {
             Class<?> clazz = (Class<?>) type;
             if (clazz.isArray()) {
@@ -175,8 +175,10 @@ public class PropertyDescriptor {
     }
 
     private void fillPropertyAttributes(boolean input) {
-        this.determineConversionExceptionClasses(this.type);
-        this.determineTypes();
+        if (input) {
+            this.determineConversionExceptionClasses(this.type);
+            this.determineTypes();
+        }
         for (Annotation annotation : this.accessMethod.getAnnotations()) {
             String error = "";
             if (annotation instanceof Required) {
@@ -188,7 +190,7 @@ public class PropertyDescriptor {
             } else if (annotation instanceof IntRangeValidator) {
                 if (!input) {
                     error = "IntRangeValidator only applies to setters";
-                } else if (!this.isIntType(this.type) && !this.isIntType(this.componentType)) {
+                } else if (!int.class.equals(this.type) && !int.class.equals(this.componentType)) {
                     error = " IntRangeValidator only applies to int or int array properties";
                 } else {
                     IntRangeValidator intRangeValidator = (IntRangeValidator) annotation;
@@ -196,13 +198,13 @@ public class PropertyDescriptor {
                         error += " max should not be less than min";
                     }
                 }
-            } else if (annotation instanceof FloatRangeValidator) {
+            } else if (annotation instanceof DoubleRangeValidator) {
                 if (!input) {
                     error = "FloatRangeValidator only applies to setters";
-                } else if (!this.isFloatType(this.type) && !this.isFloatType(this.componentType)) {
+                } else if (!double.class.equals(this.type) && !double.class.equals(this.componentType)) {
                     error = " FloatRangeValidator only applies to double or double array properties";
                 } else {
-                    FloatRangeValidator floatRangeValidator = (FloatRangeValidator) annotation;
+                    DoubleRangeValidator floatRangeValidator = (DoubleRangeValidator) annotation;
                     if (floatRangeValidator.max() < floatRangeValidator.min()) {
                         error += " max should not be less than min";
                     }
@@ -214,10 +216,10 @@ public class PropertyDescriptor {
                     error = " StringLengthValidator only applies to String or String array properties";
                 } else {
                     StringLengthValidator stringValidator = (StringLengthValidator) annotation;
-                    if (stringValidator.minLength() < 0) {
+                    if (stringValidator.min() < 0) {
                         error = " minLength should not be negative";
                     }
-                    if (stringValidator.maxLength() < stringValidator.minLength()) {
+                    if (stringValidator.max() < stringValidator.min()) {
                         error += " maxLength should not be less than minLength";
                     }
                 }
@@ -228,7 +230,9 @@ public class PropertyDescriptor {
                     error = " StringPatternValidator only applies to String or String array properties";
                 } else {
                     StringPatternValidator stringPatternValidator = (StringPatternValidator) annotation;
-                    if (stringPatternValidator.pattern().length() > 0) {
+                    if (stringPatternValidator.pattern().length() ==0) {
+                        error = "Pattern should not be empty";
+                    } else {
                         try {
                             Pattern.compile(stringPatternValidator.pattern());
                         } catch (PatternSyntaxException e) {
@@ -241,7 +245,7 @@ public class PropertyDescriptor {
             } else if (annotation instanceof Session) {
                 this.sessionVariable = true;
             } else if (annotation instanceof Cookie) {
-                if (canReadFromParameterValues(this.type)) {
+                if (canReadFromString(this.type)) {
                     this.cookieAnnotation = (Cookie) annotation;
                 } else {
                     error = "Cookie does not apply to properties with type " + this.type;
@@ -258,7 +262,8 @@ public class PropertyDescriptor {
                 continue;
             }
             if (error.length() == 0) {
-                if (!(annotation instanceof Session || annotation instanceof Cookie)) {
+                if (annotation instanceof IntRangeValidator || annotation instanceof DoubleRangeValidator ||
+                    annotation instanceof StringLengthValidator || annotation instanceof StringPatternValidator) {
                     this.validators.add(annotation);
                 }
             } else {
@@ -267,7 +272,10 @@ public class PropertyDescriptor {
                                            this.accessMethod.getName(), error));
             }
         }
+        
         if (this.sessionVariable) {
+            this.conversionExceptionClasses.clear();
+            this.rawType = this.componentType = null;
             if (this.requiredAnnotation != null) {
                 logger.error(String.format("Session variables should not have Required annotation. Location: %s.%s",
                                            this.actionDescriptor.getActionClass().getName(),
@@ -320,14 +328,6 @@ public class PropertyDescriptor {
                 this.componentType = this.rawType.getComponentType();
             }
         }
-    }
-
-    private boolean isIntType(Type type) {
-        return int.class.equals(type) || long.class.equals(type);
-    }
-
-    private boolean isFloatType(Type type) {
-        return double.class.equals(type);
     }
 
     public ActionDescriptor getActionDescriptor() {

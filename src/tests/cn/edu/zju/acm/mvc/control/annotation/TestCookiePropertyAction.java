@@ -6,9 +6,21 @@ import cn.edu.zju.acm.mvc.control.annotation.Cookie;
 
 public class TestCookiePropertyAction extends TestActionBase {
 
+    private int intProp;
+
     private String stringProp;
-    
+
     private Object objProp;
+
+    @Cookie
+    public int getIntProp() {
+        return this.intProp;
+    }
+
+    @Cookie
+    public void setIntProp(int intProp) {
+        this.intProp = intProp;
+    }
 
     @Cookie
     public String getStringProp() {

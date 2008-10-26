@@ -9,13 +9,14 @@ import java.io.File;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import cn.edu.zju.acm.mvc.control.annotation.TestSessionInvalidAnnotationsPropertyAction;
 import cn.edu.zju.acm.mvc.control.annotation.TestSessionPropertyAction;
 
-public class PropertyDescriptorSessionTest extends PropertyDescriptorTest {
+public class PropertyDescriptorSessionInvalidAnnotationsTest extends PropertyDescriptorTest {
 
     @BeforeClass
     public static void init() {
-        init(TestSessionPropertyAction.class);
+        init(TestSessionInvalidAnnotationsPropertyAction.class);
         assertThat("Invalid number of input properties", inputPropertyList.size(), is(5));
         assertThat("Invalid number of output properties", outputPropertyList.size(), is(6));
     }

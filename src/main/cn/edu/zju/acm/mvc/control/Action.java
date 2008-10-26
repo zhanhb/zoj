@@ -6,7 +6,7 @@ import java.util.List;
 
 import cn.edu.zju.acm.mvc.control.annotation.ConversionError;
 
-@ConversionError(message="error.conversion")
+@ConversionError(message = "error.conversion")
 public abstract class Action {
 
     public static final String SUCCESS = "success";

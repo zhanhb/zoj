@@ -4,7 +4,7 @@ package cn.edu.zju.acm.mvc.control;
 import java.io.File;
 import java.util.Date;
 
-public class TestInputPropertyAction extends TestActionBase {
+public class TestInputPropertyAction extends TestAction {
 
     private int intProp;
 

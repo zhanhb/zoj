@@ -8,7 +8,7 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface FloatRangeValidator {
+public @interface DoubleRangeValidator {
 
     double min() default Double.MIN_VALUE;
     
