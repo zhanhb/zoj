@@ -10,9 +10,9 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 public @interface StringLengthValidator {
 
-    int minLength() default 0;
+    int min() default 0;
 
-    int maxLength() default Integer.MAX_VALUE;
+    int max() default Integer.MAX_VALUE;
     
     String message() default "error.validation.stringlength";
 }

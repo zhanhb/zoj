@@ -32,9 +32,9 @@ public class ActionDescriptor {
 
     private Map<OneException, Class<?>> exceptionClassMap = new HashMap<OneException, Class<?>>();
 
-    private Map<String, PropertyDescriptor> inputPropertyMap = new HashMap<String, PropertyDescriptor>();
+    private Map<String, PropertyDescriptor> inputPropertyMap = new LinkedHashMap<String, PropertyDescriptor>();
 
-    private Map<String, PropertyDescriptor> outputPropertyMap = new HashMap<String, PropertyDescriptor>();
+    private Map<String, PropertyDescriptor> outputPropertyMap = new LinkedHashMap<String, PropertyDescriptor>();
 
     private String conversionErrorMessageKey = null;
 

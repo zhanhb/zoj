@@ -2,56 +2,25 @@
 package cn.edu.zju.acm.mvc.control;
 
 import static org.hamcrest.core.Is.is;
-import static org.hamcrest.core.IsNull.notNullValue;
 import static org.junit.Assert.assertThat;
 
 import java.io.File;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Type;
 import java.text.ParseException;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 
-import org.apache.commons.beanutils.ConversionException;
-import org.hamcrest.core.IsEqual;
-import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class PropertyDescriptorInputTest extends PropertyDescriptorTest {
 
-    protected List<Annotation> validators;
-
-    protected Class<?> rawType;
-
-    protected Class<?> componentType;
-
-    protected List<Class<? extends Exception>> conversionExceptionClasses;
-
-    @Before
-    public void setUp() {
-        super.setUp();
-        this.validators = new ArrayList<Annotation>();
-        this.rawType = null;
-        this.componentType = null;
-        this.conversionExceptionClasses = new ArrayList<Class<? extends Exception>>();
-        this.owner = new MockActionDescriptor(TestInputPropertyAction.class);
+    @BeforeClass
+    public static void init() {
+        init(TestInputPropertyAction.class);
+        assertThat("Invalid number of input properties", inputPropertyList.size(), is(12));
     }
 
     protected void check() {
-        List<PropertyDescriptor> propertyDescriptorList = PropertyDescriptor.getInputProperties(this.owner);
-        PropertyDescriptor propertyDescriptor = this.getPropertyDescriptor(propertyDescriptorList);
-        assertThat("Invalid raw type", propertyDescriptor.getRawType(), is(new IsEqual<Class<?>>(this.rawType)));
-        assertThat("Invalid component type", propertyDescriptor.getComponentType(),
-                   is(new IsEqual<Class<?>>(this.componentType)));
-        assertThat("Invalid access method", propertyDescriptor.getAccessMethod(), notNullValue());
-        assertThat("Invalid name", propertyDescriptor.getName(), is(this.name));
-        assertThat("Invalid owner", propertyDescriptor.getActionDescriptor(),
-                   is(new IsEqual<ActionDescriptor>(this.owner)));
-        assertThat("Invalid possibleExceptionClass", propertyDescriptor.getConversionExceptionClasses(),
-                   is(new IsEqual<List<Class<? extends Exception>>>(this.conversionExceptionClasses)));
-        assertThat("Invalid type", propertyDescriptor.getType(), is(new IsEqual<Type>(this.type)));
-        assertThat("Invalid validators", propertyDescriptor.getValidators(), is(this.validators));
+        super.check(this.getPropertyDescriptor(inputPropertyList));
     }
 
     @Test
@@ -131,7 +100,7 @@ public class PropertyDescriptorInputTest extends PropertyDescriptorTest {
     public void testFile() {
         this.type = this.rawType = File.class;
         this.name = "fileProp";
-        // this.conversionExceptionClasses = new Class[] {ConversionException.class};
+        // TODO
         this.check();
     }
 

@@ -5,40 +5,53 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 
 import java.lang.annotation.Annotation;
-import java.util.List;
 
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import cn.edu.zju.acm.mvc.control.annotation.validator.StringPatternValidator;
-import cn.edu.zju.acm.mvc.control.annotation.validator.StringPatternValidatorAction;
+import cn.edu.zju.acm.mvc.control.annotation.validator.TestStringPatternValidatorAction;
 
 public class PropertyDescriptorStringPatternValidatorTest extends PropertyDescriptorTest {
 
-    private String pattern = "";
+    private String pattern;
+
+    @BeforeClass
+    public static void init() {
+        init(TestStringPatternValidatorAction.class);
+        assertThat("Invalid number of input properties", inputPropertyList.size(), is(2));
+    }
 
     @Before
     public void setUp() {
         super.setUp();
+        this.pattern = null;
     }
 
     public void check(String name) {
         this.name = name;
-        PropertyDescriptor propertyDescriptor =
-                this
-                    .getPropertyDescriptor(PropertyDescriptor
-                                                             .getInputProperties(new MockActionDescriptor(
-                                                                                                          StringPatternValidatorAction.class)));
-        List<Annotation> annotationList = propertyDescriptor.getValidators();
-        assertThat(annotationList.size(), is(1));
-        assertThat(annotationList.get(0), is(StringPatternValidator.class));
-        StringPatternValidator validator = (StringPatternValidator) annotationList.get(0);
+        this.validatorListSize = 1;
+        PropertyDescriptor propertyDescriptor = this.getPropertyDescriptor(inputPropertyList);
+        this.check(propertyDescriptor);
+        Annotation annotation =propertyDescriptor.getValidators().get(0);
+        assertThat(annotation, is(StringPatternValidator.class));
+        StringPatternValidator validator = (StringPatternValidator) annotation;
         assertThat(validator.pattern(), is(this.pattern));
     }
 
     @Test
-    public void testStringValidatorPattern() {
-        this.pattern = "pattern";
-        this.check("patternProp");
+    public void testString() {
+        this.type = this.rawType = String.class;
+        this.pattern = "a*";
+        this.check("stringProp");
+    }
+    
+    @Test
+    public void testStringArray() {
+        this.type = this.rawType = String[].class;
+        this.componentType = String.class;
+        this.pattern = "a*";
+        this.check("stringArrayProp");
     }
 }

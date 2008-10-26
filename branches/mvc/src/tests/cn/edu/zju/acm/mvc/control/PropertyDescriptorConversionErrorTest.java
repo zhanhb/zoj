@@ -2,64 +2,122 @@
 package cn.edu.zju.acm.mvc.control;
 
 import static org.hamcrest.core.Is.is;
-import static org.hamcrest.core.IsNull.nullValue;
 import static org.junit.Assert.assertThat;
 
-import java.util.List;
-
+import org.junit.After;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import cn.edu.zju.acm.mvc.control.annotation.TestConversionErrorOnPropertyAction;
 
 public class PropertyDescriptorConversionErrorTest extends PropertyDescriptorTest {
 
-    @Test
-    public void testInput() {
-        List<PropertyDescriptor> inputProperties =
-                PropertyDescriptor
-                                  .getInputProperties(new MockActionDescriptor(TestConversionErrorOnPropertyAction.class));
-        for (PropertyDescriptor propertyDescriptor : inputProperties) {
-            if (propertyDescriptor.getType().equals(int.class)) {
-                assertThat(propertyDescriptor.getConversionErrorMessageKey(), is("error"));
-            } else {
-                assertThat(propertyDescriptor.getConversionErrorMessageKey(), nullValue());
-            }
-        }
+    @BeforeClass
+    public static void init() {
+        init(TestConversionErrorOnPropertyAction.class);
+        assertThat("Invalid number of input properties", inputPropertyList.size(), is(3));
+        assertThat("Invalid number of output properties", outputPropertyList.size(), is(4));
+    }
+    
+    @After
+    public void tearDown() {
+        actionDescriptor.setConversionErrorMessageKey(null);
     }
 
     @Test
-    public void testOutput() {
-        List<PropertyDescriptor> outputProperties =
-                PropertyDescriptor
-                                  .getOutputProperties(new MockActionDescriptor(TestConversionErrorOnPropertyAction.class));
-        for (PropertyDescriptor propertyDescriptor : outputProperties) {
-            assertThat(propertyDescriptor.getConversionErrorMessageKey(), nullValue());
-        }
+    public void testInputInt() {
+        this.type = this.rawType = int.class;
+        this.name = "intProp";
+        this.conversionExceptionClasses.add(NumberFormatException.class);
+        this.conversionErrorMessageKey = "error";
+        this.check(this.getPropertyDescriptor(inputPropertyList));
     }
-
+    
     @Test
-    public void testInputWithMessageOnAction() {
-        MockActionDescriptor actionDescriptor = new MockActionDescriptor(TestConversionErrorOnPropertyAction.class);
+    public void testInputDouble() {
+        this.type = this.rawType = double.class;
+        this.name = "doubleProp";
+        this.conversionExceptionClasses.add(NumberFormatException.class);
+        this.check(this.getPropertyDescriptor(inputPropertyList));
+    }
+    
+    @Test
+    public void testInputString() {
+        this.type = this.rawType = String.class;
+        this.name = "stringProp";
+        this.check(this.getPropertyDescriptor(inputPropertyList));
+    }
+    
+    @Test
+    public void testOutputInt() {
+        this.type = int.class;
+        this.name = "intProp";
+        this.check(this.getPropertyDescriptor(outputPropertyList));
+    }
+    
+    @Test
+    public void testOutputDouble() {
+        this.type = double.class;
+        this.name = "doubleProp";
+        this.check(this.getPropertyDescriptor(outputPropertyList));
+    }
+    
+    @Test
+    public void testOutputString() {
+        this.type = String.class;
+        this.name = "stringProp";
+        this.check(this.getPropertyDescriptor(outputPropertyList));
+    }
+    
+    @Test
+    public void testInputIntWithActionMessage() {
         actionDescriptor.setConversionErrorMessageKey("test");
-        List<PropertyDescriptor> inputProperties = PropertyDescriptor.getInputProperties(actionDescriptor);
-        for (PropertyDescriptor propertyDescriptor : inputProperties) {
-            if (propertyDescriptor.getType().equals(int.class)) {
-                assertThat(propertyDescriptor.getConversionErrorMessageKey(), is("error"));
-            } else if (propertyDescriptor.getType().equals(double.class)) {
-                assertThat(propertyDescriptor.getConversionErrorMessageKey(), is("test"));
-            } else {
-                assertThat(propertyDescriptor.getConversionErrorMessageKey(), nullValue());
-            }
-        }
+        this.type = this.rawType = int.class;
+        this.name = "intProp";
+        this.conversionExceptionClasses.add(NumberFormatException.class);
+        this.conversionErrorMessageKey = "error";
+        this.check(this.getPropertyDescriptor(inputPropertyList));
     }
-
+    
     @Test
-    public void testOutputWithMessageOnAction() {
-        MockActionDescriptor actionDescriptor = new MockActionDescriptor(TestConversionErrorOnPropertyAction.class);
+    public void testInputDoubleWithActionMessage() {
         actionDescriptor.setConversionErrorMessageKey("test");
-        List<PropertyDescriptor> outputProperties = PropertyDescriptor.getOutputProperties(actionDescriptor);
-        for (PropertyDescriptor propertyDescriptor : outputProperties) {
-            assertThat(propertyDescriptor.getConversionErrorMessageKey(), nullValue());
-        }
+        this.type = this.rawType = double.class;
+        this.name = "doubleProp";
+        this.conversionExceptionClasses.add(NumberFormatException.class);
+        this.conversionErrorMessageKey = "test";
+        this.check(this.getPropertyDescriptor(inputPropertyList));
+    }
+    
+    @Test
+    public void testInputStringWithActionMessage() {
+        actionDescriptor.setConversionErrorMessageKey("test");
+        this.type = this.rawType = String.class;
+        this.name = "stringProp";
+        this.check(this.getPropertyDescriptor(inputPropertyList));
+    }
+    
+    @Test
+    public void testOutputIntWithActionMessage() {
+        actionDescriptor.setConversionErrorMessageKey("test");
+        this.type = int.class;
+        this.name = "intProp";
+        this.check(this.getPropertyDescriptor(outputPropertyList));
+    }
+    
+    @Test
+    public void testOutputDoubleWithActionMessage() {
+        actionDescriptor.setConversionErrorMessageKey("test");
+        this.type = double.class;
+        this.name = "doubleProp";
+        this.check(this.getPropertyDescriptor(outputPropertyList));
+    }
+    
+    @Test
+    public void testOutputStringWithActionMessage() {
+        actionDescriptor.setConversionErrorMessageKey("test");
+        this.type = String.class;
+        this.name = "stringProp";
+        this.check(this.getPropertyDescriptor(outputPropertyList));
     }
 }
